@@ -24,3 +24,6 @@
 
 # Rplot default output
 Rplots.pdf
+
+# recount2 data from figshare
+data/recount2_PLIER_data
