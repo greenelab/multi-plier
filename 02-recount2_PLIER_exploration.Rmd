@@ -1,0 +1,336 @@
+---
+title: "recount2 PLIER exploratory analyses"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+Pathway Level Information ExtractoR (**PLIER**) ([Mao, et al. _bioRxiv._ 2017.](https://doi.org/10.1101/116061)) is a framework that explicitly aligns latent variables (LVs) with prior knowledge in the form of (often curated) gene sets. 
+Comparisons of PLIER to other methods (e.g., sparse PCA) and other evaluations can be found in the PLIER preprint.
+
+We're going to explore the [recount2](https://jhubiostatistics.shinyapps.io/recount/) 
+dataset and the corresponding [PLIER model](https://doi.org/10.6084/m9.figshare.5716033.v4).
+(See [greenelab/rheum-plier-data](https://github.com/greenelab/rheum-plier-data/tree/4be547553f24fecac9e2f5c2b469a17f9df253f0) 
+for the processing code.) 
+We're interested in coming up with ways to characterize PLIER models (and eventually compare them).
+
+## Functions
+```{r}
+`%>%` <- dplyr::`%>%`
+# custom functions
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plots directory specifcally for this notebook
+plot.dir <- file.path("plots", "02")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+
+## Load data
+```{r}
+# PLIER model
+plier.results <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+
+# data that was prepped for use with PLIER
+recount.list <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                  "recount_data_prep_PLIER.RDS"))
+```
+
+
+## U matrix
+
+If the prior information coefficient matrix, _U_, has a low number of positive 
+entries for each LV, biological interpretation should be more straightforward. 
+This is one of the constraints in the PLIER model.
+
+### All LVs
+
+For each latent variable (i.e., not just those significantly associated with
+prior information), how many of the pathways/genesets have a positive entry?
+
+```{r}
+u.sparsity.all <- CalculateUSparsity(plier.results = plier.results,
+                                     significant.only = FALSE)
+
+ggplot2::ggplot(as.data.frame(u.sparsity.all),
+                ggplot2::aes(x = u.sparsity.all)) +
+  ggplot2::geom_density(fill = "blue", alpha = 0.5) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "proportion of positive entries in U") +
+  ggplot2::ggtitle("All LVs")
+```
+```{r}
+png.file <- file.path(plot.dir, "recount2_prop_pos_entries_U_all_lvs.png")
+ggplot2::ggsave(filename = png.file, plot = ggplot2::last_plot(), 
+                width = 7, height = 5, units = "in")
+```
+
+```{r}
+summary(u.sparsity.all)
+```
+
+### Pathway-associated LVs, only
+
+Now, consider each "significant" LV.
+
+```{r}
+u.sparsity.sig <- CalculateUSparsity(plier.results, 
+                                     significant.only = TRUE,
+                                     fdr.cutoff = 0.05)
+
+ggplot2::ggplot(as.data.frame(u.sparsity.sig),
+                ggplot2::aes(x = u.sparsity.sig)) +
+  ggplot2::geom_density(fill = "blue", alpha = 0.5) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "proportion of positive entries in U") +
+  ggplot2::ggtitle("Pathway-associated LVs")
+```
+```{r}
+png.file <- file.path(plot.dir, 
+                      "recount2_prop_pos_entries_U_significant_lvs.png")
+ggplot2::ggsave(filename = png.file, plot = ggplot2::last_plot(), 
+                width = 7, height = 5, units = "in")
+```
+
+```{r}
+summary(u.sparsity.sig)
+```
+
+## Pathway coverage
+
+We're interested in how the LVs output from PLIER are related to the genesets 
+input to PLIER. 
+
+```{r}
+coverage.results <- GetPathwayCoverage(plier.results = plier.results)
+```
+
+**What proportion of the pathways input into PLIER are significantly associated 
+(FDR cutoff = 0.05) with LVs?**
+```{r}
+# Pathway coverage results
+coverage.results$pathway
+```
+
+**What proportion of the PLIER LVs have a gene set associated with them?**
+```{r}
+# LVs
+coverage.results$lv
+```
+
+## Reconstruction of gene expression data
+
+### All LVs
+
+We reconstruct gene expression data from the gene loadings and LVs.
+
+```{r}
+# reconstructed recount2 expression data from PLIER model
+recount.recon <- GetReconstructedExprs(z.matrix = as.matrix(plier.results$Z),
+                                       b.matrix = as.matrix(plier.results$B))
+# input expression data from intermediate file
+recount.input.exprs <- recount.list$rpkm.cm
+```
+
+#### Reconstruction error
+```{r}
+# calculate reconstruction error (per sample)
+recon.error <- GetReconstructionMASE(true.mat = recount.input.exprs, 
+                                     recon.mat = recount.recon)
+
+# density plot
+ggplot2::ggplot(as.data.frame(recon.error), ggplot2::aes(x = recon.error)) + 
+  ggplot2::geom_density(fill = "blue", alpha = 0.4) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "MASE",
+                title = "Input vs. PLIER reconstructed recount2 data",
+                subtitle = "All LVs") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
+```
+
+```{r}
+png.file <- file.path(plot.dir, 
+                      "recount2_recon_MASE_all_lvs.png")
+ggplot2::ggsave(filename = png.file, plot = ggplot2::last_plot(), 
+                width = 7, height = 5, units = "in")
+```
+
+#### Spearman correlation (input, reconstructed)
+
+Spearman correlation between input and reconstructed values was used as an 
+evaluation in [Cleary, et al.](https://doi.org/10.1016/j.cell.2017.10.023)
+
+```{r}
+# calculate correlation 
+recon.cor <- GetReconstructionCorrelation(true.mat = recount.input.exprs,
+                                          recon.mat = recount.recon)
+
+# density plot
+ggplot2::ggplot(as.data.frame(recon.cor), ggplot2::aes(x = recon.cor)) + 
+  ggplot2::geom_density(fill = "blue", alpha = 0.4) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Spearman Correlation",
+                title = "Input vs. PLIER reconstructed recount2 data",
+                subtitle = "All LVs") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
+```
+```{r}
+png.file <- file.path(plot.dir, 
+                      "recount2_recon_spearman_all_lvs.png")
+ggplot2::ggsave(filename = png.file, plot = ggplot2::last_plot(), 
+                width = 7, height = 5, units = "in")
+```
+
+#### Relationship between error and correlation
+
+We expect that samples that are highly correlated pre- and post-PLIER should 
+have low MASE.
+
+```{r}
+ggplot2::ggplot(as.data.frame(cbind(recon.cor, recon.error)), 
+                ggplot2::aes(x = recon.cor,
+                             y = recon.error)) +
+  ggplot2::geom_point(alpha = 0.2) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Spearman Correlation",
+                y = "MASE",
+                title = "All LVs")
+```
+```{r}
+png.file <- file.path(plot.dir, 
+                      "recount2_error_cor_scatter_all_lvs.png")
+ggplot2::ggsave(filename = png.file, plot = ggplot2::last_plot(), 
+                width = 7, height = 5, units = "in")
+```
+
+### Pathway-associated LVs, only
+
+Here, we'll filter the _Z_ and _B_ matrices to only include LVs that are 
+significantly associated with a pathway/gene set that was supplied during the 
+training of the PLIER model. 
+We'll use an FDR cutoff of 0.05 (as we did for `CalculateUSparsity` above).
+
+```{r}
+plier.summary <- plier.results$summary
+sig.summary <- plier.summary %>%
+                  dplyr::filter(FDR < 0.05)
+sig.lvs <- unique(sig.summary$`LV index`)
+```
+
+```{r}
+# drop columns (LVs) from Z that are not significantly associated with prior 
+# info
+z.mat <- plier.results$Z
+sig.z.mat <- z.mat[, as.integer(sig.lvs)]
+
+# drop rows (LVs) from B that are not significantly associated with prior info
+b.mat <- plier.results$B
+sig.b.mat <- b.mat[as.integer(sig.lvs), ]
+```
+
+```{r}
+# the reconstruction itself only with significant LVs
+sig.recon <- GetReconstructedExprs(z.matrix = sig.z.mat,
+                                   b.matrix = sig.b.mat)
+```
+
+#### Reconstruction error
+```{r}
+# calculate reconstruction error (per sample)
+sig.recon.error <- GetReconstructionMASE(true.mat = recount.input.exprs, 
+                                         recon.mat = sig.recon)
+```
+
+
+#### Spearman correlation (input, reconstructed)
+```{r}
+# calculate correlation 
+sig.recon.cor <- GetReconstructionCorrelation(true.mat = recount.input.exprs,
+                                              recon.mat = sig.recon)
+
+```
+
+#### Plotting
+
+```{r}
+# tidy format
+recon.eval.df <- 
+  rbind(cbind(recon.error, recon.cor, rep("All", length(recon.error))),
+        cbind(sig.recon.error, sig.recon.cor, rep("Pathway-associated", 
+                                                  length(sig.recon.error))))
+colnames(recon.eval.df) <- c("MASE", 
+                             "Spearman correlation",
+                             "LVs used in reconstruction")
+recon.eval.df <- 
+  as.data.frame(recon.eval.df) %>%
+    dplyr::mutate(MASE = as.numeric(as.character(MASE)),
+                  `Spearman correlation` = 
+                    as.numeric(as.character(`Spearman correlation`)))
+
+```
+
+
+**MASE plot**
+```{r}
+# density plot
+ggplot2::ggplot(recon.eval.df, 
+                ggplot2::aes(x = MASE, group = `LVs used in reconstruction`,
+                             fill = `LVs used in reconstruction`)) + 
+  ggplot2::geom_density(alpha = 0.4) +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("white", "black")) +
+  ggplot2::labs(title = "Input vs. PLIER reconstructed recount2 data") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
+```
+
+```{r}
+png.file <- file.path(plot.dir, 
+                      "recount2_recon_MASE.png")
+ggplot2::ggsave(filename = png.file, plot = ggplot2::last_plot(), 
+                width = 7, height = 5, units = "in")
+```
+
+
+**Correlation plot**
+```{r}
+# density plot
+ggplot2::ggplot(recon.eval.df, 
+                ggplot2::aes(x = `Spearman correlation`, 
+                             group = `LVs used in reconstruction`,
+                             fill = `LVs used in reconstruction`)) + 
+  ggplot2::geom_density(alpha = 0.4) +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("white", "black")) +
+  ggplot2::labs(title = "Input vs. PLIER reconstructed recount2 data") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
+```
+```{r}
+png.file <- file.path(plot.dir, 
+                      "recount2_recon_spearman.png")
+ggplot2::ggsave(filename = png.file, plot = ggplot2::last_plot(), 
+                width = 7, height = 5, units = "in")
+```
+
+**Scatterplot**
+```{r}
+ggplot2::ggplot(recon.eval.df,
+                ggplot2::aes(x = `Spearman correlation`,
+                             y = MASE)) +
+  ggplot2::geom_point(alpha = 0.5) +
+  ggplot2::facet_wrap(~ `LVs used in reconstruction`) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(title = "Input vs. PLIER reconstructed recount2 data") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
+```
+```{r}
+png.file <- file.path(plot.dir, 
+                      "recount2_recon_scatter.png")
+ggplot2::ggsave(filename = png.file, plot = ggplot2::last_plot(), 
+                width = 10, height = 5, units = "in")
+```
