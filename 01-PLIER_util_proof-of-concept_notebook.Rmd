@@ -17,7 +17,7 @@ subset of PLIER custom functions. Specifically, checking the operations for:
   `GetReconstructionCorrelation()`
 
 Here, I use the **NARES dataset** for convenience due to its relatively small 
-size(n = 77). 
+size (n = 77). 
 
 #### Load libraries and custom functions
 ```{r}
@@ -121,12 +121,20 @@ recon.correlation <- GetReconstructionCorrelation(true.mat = nares.rownorm,
 Plot density
 ```{r}
 # density plot
-ggplot2::ggplot(as.data.frame(recon.correlation), 
+p <- ggplot2::ggplot(as.data.frame(recon.correlation), 
                 ggplot2::aes(x = recon.correlation)) + 
-  ggplot2::geom_density() +
-  ggplot2::theme_bw() +
-  ggplot2::labs(x = "Spearman Correlation",
-                title = "Input vs. PLIER reconstructed NARES data") +
-  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
+      ggplot2::geom_density() +
+      ggplot2::theme_bw() +
+      ggplot2::labs(x = "Spearman Correlation",
+                    title = "Input vs. PLIER reconstructed NARES data") +
+      ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                        face = "bold"))
+p
 ```
 
+```{r}
+png.file <- file.path("plots", 
+                      "NARES_reconstructed_data_correlation_density.png")
+ggplot2::ggsave(filename = png.file, plot = p, width = 4, height = 3,
+                units = "in")
+```
