@@ -27,6 +27,13 @@ library(PLIER)
 source(file.path("util", "plier_util.R"))
 ```
 
+```{r}
+# plots directory specifically for this notebook
+dir.create(file.path("plots", "01"), recursive = TRUE,
+           showWarnings = FALSE)
+```
+
+
 #### NARES expression data
 
 ```{r}
@@ -133,8 +140,8 @@ p
 ```
 
 ```{r}
-png.file <- file.path("plots", 
+png.file <- file.path("plots", "01",
                       "NARES_reconstructed_data_correlation_density.png")
-ggplot2::ggsave(filename = png.file, plot = p, width = 4, height = 3,
+ggplot2::ggsave(filename = png.file, plot = p, width = 7, height = 5,
                 units = "in")
 ```
