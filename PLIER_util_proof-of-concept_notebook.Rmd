@@ -1,6 +1,8 @@
 ---
 title: "PLIER Utils proof-of-concept"
-output: html_notebook
+output:
+  html_notebook: default
+  pdf_document: default
 ---
 **J. Taroni 2018** 
 
