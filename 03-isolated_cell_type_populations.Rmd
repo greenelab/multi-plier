@@ -1,0 +1,134 @@
+---
+title: "Isolated immune cell populations: microarray data"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+[E-MTAB-2452](https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-2452/): 
+Sorted peripheral blood cells (CD4+ T cells, CD14+ monocytes, CD16+ neutrophils)
+profiled on microarray from several autoimmune diseases.
+This dataset is a good control for further investigating recount2 PLIER model 
+(cross-platform) transfer learning.
+
+## Functions and set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+library(AnnotationDbi)
+# custom functions
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "03")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "03")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+### `recount2` PLIER model
+
+```{r}
+plier.results <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+### Isolated cell subsets microarray data
+```{r}
+# read in E-MTAB-2452 expression data that has been processed with SCANfast
+exprs.df <- readr::read_tsv(file.path("data", "expression_data",
+                                      "E-MTAB-2452_hugene11st_SCANfast.pcl"))
+colnames(exprs.df)[1] <- "EntrezID"
+```
+
+#### Conversion to gene symbol
+```{r}
+# remove trailing "_at" (result of using BrainArray) to get EntrezIDs
+exprs.df$EntrezID <- gsub("_at", "", exprs.df$EntrezID)
+
+# conversion to gene symbol
+symbol.obj <- org.Hs.eg.db::org.Hs.egSYMBOL
+mapped.genes <- AnnotationDbi::mappedkeys(symbol.obj)
+symbol.list <- as.list(symbol.obj[mapped.genes])
+symbol.df <- as.data.frame(cbind(names(symbol.list), unlist(symbol.list)))
+colnames(symbol.df) <- c("EntrezID", "GeneSymbol")
+
+# inner join
+annot.data <- dplyr::inner_join(symbol.df, exprs.df, by = "EntrezID")
+
+# remove objects only necessary for annotation
+rm(mapped.genes, symbol.list, symbol.obj, symbol.df)
+
+# write to file
+gs.file <- file.path("data", "expression_data", 
+                     "E-MTAB-2452_hugene11st_SCANfast_with_GeneSymbol.pcl")
+readr::write_tsv(annot.data, path = gs.file)
+
+# get as a matrix 
+exprs.mat <- as.matrix(annot.data[, 3:ncol(annot.data)])
+rownames(exprs.mat) <- annot.data$GeneSymbol
+```
+
+## Apply recount2 model
+
+### B matrix
+```{r}
+iso.b.matrix <- GetNewDataB(exprs.mat = exprs.mat,
+                            plier.model = plier.results)
+head(iso.b.matrix[, 1:10])
+```
+```{r}
+# write to file
+iso.b.file <- file.path(results.dir, "E-MTAB-2452_B_matrix_recount2_model.txt")
+write.table(iso.b.matrix, file = iso.b.file, sep = "\t", quote = FALSE)
+```
+
+### Heatmap
+
+```{r}
+# differences in cell type LVs?
+indx.relevant.lv <- c(grep("CD4", rownames(iso.b.matrix)),
+                      grep("Monocyte", rownames(iso.b.matrix)),
+                      grep("Neutrophil", rownames(iso.b.matrix)))
+
+# get row side color vector matching relevant cell type LVs
+row.colors.vec <- c(rep("#1E90EF", sum(grepl("CD4", rownames(iso.b.matrix)))),
+                    rep("#000000", 
+                        sum(grepl("Monocyte", rownames(iso.b.matrix)))), 
+                    rep("#32CD32",
+                        sum(grepl("Neutrophil", rownames(iso.b.matrix)))))
+
+# get col side color vector based on what cell type each sample is
+col.colors.vec <- rep("white", ncol(iso.b.matrix))
+col.colors.vec[grep("CD4", colnames(iso.b.matrix))] <- "#1E90EF"
+col.colors.vec[grep("CD14", colnames(iso.b.matrix))] <- "#000000"
+col.colors.vec[grep("CD16", colnames(iso.b.matrix))] <- "#32CD32"
+
+# heatmap
+hm <- gplots::heatmap.2(iso.b.matrix[indx.relevant.lv, ], 
+                        trace = "none",
+                        col = colorRampPalette(c("blue", "white", "red")),
+                        cexCol = 0.35, cexRow = 0.25,
+                        RowSideColors = row.colors.vec,
+                        ColSideColors = col.colors.vec)
+```
+```{r}
+# save heatmap as pdf -- can not figure out another way around this, hm just
+# returns a list
+pdf(file.path(plot.dir, "E-MTAB-2452_recount_PLIER_cell_type_LVs_B.pdf"))
+gplots::heatmap.2(iso.b.matrix[indx.relevant.lv, ], 
+                  trace = "none",
+                  col = colorRampPalette(c("blue", "white", "red")),
+                  cexCol = 0.35, cexRow = 0.25,
+                  RowSideColors = row.colors.vec,
+                  ColSideColors = col.colors.vec)
+dev.off()
+```
+
