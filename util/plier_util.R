@@ -138,7 +138,6 @@ GetNewDataB <- function(exprs.mat, plier.model) {
   
 }
 
-
 GetReconstructedExprs <- function(z.matrix, b.matrix) {
   # Get "reconstructed" expression data from PLIER loadings and latent variables
   # 
@@ -278,14 +277,7 @@ GetPathwayCoverage <- function(plier.results, fdr.cutoff = 0.05) {
   summary.df <- plier.results$summary
   input.pathways <- colnames(plier.results$C)
   num.lvs <- ncol(plier.results$U)
-  
-  # if FDR has not been calculated "within" PLIER, throw an error
-  fdr.calculated <- "FDR" %in% colnames(summary.df)
-  if (!fdr.calculated) {
-    stop("FDR not found in plier.results$summary -- use AddSummaryFDR
-         before proceeding!")
-  }
-  
+
   # identify the pathways that have significant associations with latent
   # variables, using the value from the fdr.cutoff argument
   sig.pathways <- 
@@ -346,17 +338,6 @@ CalculateUSparsity <- function(plier.results, significant.only = FALSE,
   # U matrix
   data.mat <- plier.results$U
   no.entries <- nrow(data.mat)  # how many pathways/gene sets were included?
-  
-  # check if FDR values are in the summary data.frame
-  fdr.calculated <- "FDR" %in% colnames(summary.df)
-  
-  # error handling
-  # if we're only going to use LVs that are significant and the FDR has not
-  # yet been calculated, throw an error
-  if (significant.only & !fdr.calculated) {
-    stop("No FDR values in plier.results$summary, do you need to use
-         AddSummaryFDR?")
-  }
   
   # MAIN: calculate proportion of positive or "significant" entries in each
   # column of U (data.mat)
