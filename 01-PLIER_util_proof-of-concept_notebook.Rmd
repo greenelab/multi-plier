@@ -119,7 +119,13 @@ nares.rownorm <- nares.rownorm[rownames(nares.recon), ]
 ```
 
 Spearman correlation between input, row-normalized expression data and the
-reconstructed data
+reconstructed data.
+If correlation between the input and the reconstructed data is high, that
+suggests that reconstruction is "successful." 
+Given the different constraints in PLIER, we would not expect to perfectly 
+(`rho = 1`) reconstruct the input data.
+This particular evaluation will be _most useful_ when we look at applying a
+trained PLIER model to a test dataset.
 ```{r}
 recon.correlation <- GetReconstructionCorrelation(true.mat = nares.rownorm,
                                                   recon.mat = nares.recon)
