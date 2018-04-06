@@ -42,7 +42,7 @@ PLIERNewData <- function(exprs.mat, seed = 12345) {
   
   # PLIER main function + return results
   plier.res <- PLIER::PLIER(exprs.norm[cm.genes, ], all.paths[cm.genes, ], 
-                            k = round((set.k + set.k*0.3), 0), trace = TRUE)
+                            k = round((set.k + set.k * 0.3), 0), trace = TRUE)
   
   return(plier.res)
   
@@ -195,13 +195,11 @@ GetReconstructionMASE <- function(true.mat, recon.mat){
     return(mase)
   }
   
-  mase <- vector()
-  for (col.iter in 1:ncol(true.mat)){
-    # for each gene (column), calculate the MASE between the true expression 
-    # values and the expression values after reconstruction
-    mase[col.iter] <- CalculateMASE(y = true.mat[, col.iter], 
-                                    y.pred = recon.mat[, col.iter])
-  }
+  # for each gene (column), calculate the MASE between the true expression 
+  # values and the expression values after reconstruction
+  mase <- sapply(1:ncol(true.mat), 
+                 function(x) CalculateMASE(y = true.mat[, x], 
+                                           y.pred = recon.mat[, x]))
   
   # return a vector of mean absolute scaled errors
   return(mase)
@@ -303,7 +301,7 @@ GetPathwayCoverage <- function(plier.results, fdr.cutoff = 0.05) {
   
   return(return.list)
   
-  }
+}
 
 CalculateUSparsity <- function(plier.results, significant.only = FALSE,
                                fdr.cutoff = 0.05) {
