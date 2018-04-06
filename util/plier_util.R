@@ -88,15 +88,8 @@ GetOrderedRowNorm <- function(exprs.mat, plier.model) {
   rownames(miss.mat) <- genes.not.exprs
   # add into common gene expression matrix
   exprs.cg <- rbind(exprs.cg, miss.mat)
-  
-  # reorder genes in the expression matrix to match the Z matrix from the
-  # PLIER model
-  indx.vector <- vector()
-  for(row.iter in 1:nrow(exprs.cg)) {
-    indx.vector[row.iter] <- 
-      which(rownames(z.mat) == rownames(exprs.cg)[row.iter])
-  }
-  ord.rownorm <- exprs.cg[order(indx.vector), ]
+  # reorder rows
+  ord.rownorm <- exprs.cg[genes.in.model, ]
   
   # check reordering
   gene.ord.chk <- all.equal(rownames(ord.rownorm), rownames(z.mat))
