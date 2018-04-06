@@ -309,17 +309,17 @@ CalculateUSparsity <- function(plier.results, significant.only = FALSE,
   # calculates what proportion of each of the columns of plier.results$U 
   # (prior information coefficient matrix) have positive entries. 
   # This can be performed using all positive entries (significant.only = FALSE,
-  # the default) or using only latent variables (LVs) that are significantly
-  # associated with pathway/prior information (signifcant.only = TRUE). We 
-  # use plier.results$summary and the specified FDR cutoff (0.05 by default) to
+  # the default) or using only pathways/priori that are significantly
+  # associated with an LV(signifcant.only = TRUE). We use plier.results$summary 
+  # and the specified FDR cutoff (0.05 by default) to
   # determine with LVs are significantly associated with a pathway or gene set.
   # 
   # Args:
   #   plier.results: output of main PLIER function (PLIER::PLIER), contains the
   #                  U (prior information coefficient) matrix and summary 
   #                  data.frame required for the calculation
-  #   significant.only: logical - should only LVs that are significantly 
-  #                     associated with a pathway/prior information be taken 
+  #   significant.only: logical - should only pathways that are significantly 
+  #                     associated with an LV information be taken 
   #                     into account? default is FALSE -> all positive entries
   #                     will be used in the calculation
   #   fdr.cutoff: the FDR cutoff used to determine which LVs should be taken
