@@ -239,6 +239,8 @@ GetReconstructionCorrelation <- function(true.mat, recon.mat,
   for (col.iter in 1:ncol(true.mat)){
     # for each gene (column), calculate the MASE between the true expression 
     # values and the expression values after reconstruction
+    # due to size of matrices, this is more efficient than calculating 
+    # correlation between all values
     cor.vect[col.iter] <- cor(true.mat[, col.iter],
                               recon.mat[, col.iter],
                               method = cor.method)
