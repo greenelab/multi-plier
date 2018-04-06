@@ -4,7 +4,10 @@
 PLIERNewData <- function(exprs.mat, seed = 12345) {
   # A wrapper function for applying PLIER to a data set. We use the following
   # genesets that come with PLIER: bloodCellMarkersIRISDMAP, svmMarkers, 
-  # and canonicalPathways.
+  # and canonicalPathways. We set the k parameter for the PLIER model by
+  # identifying the number of "significant PCs" with PLIER::num.pc and then 
+  # using sig PCs * 0.3. This is consistent with recommendations from the 
+  # PLIER authors.
   # 
   # Args:
   #   exprs.mat: a gene expression matrix, rows are genes, columns are samples
@@ -24,22 +27,22 @@ PLIERNewData <- function(exprs.mat, seed = 12345) {
   data(canonicalPathways)
   
   # combine the pathway data from PLIER
-  all.paths <- combinePaths(bloodCellMarkersIRISDMAP, svmMarkers, 
-                            canonicalPathways)
+  all.paths <- PLIER::combinePaths(bloodCellMarkersIRISDMAP, svmMarkers, 
+                                   canonicalPathways)
   
   # what genes are common to the pathway data and the expression matrix
-  cm.genes <- commonRows(all.paths, exprs.mat)
+  cm.genes <- PLIER::commonRows(all.paths, exprs.mat)
   
   # row normalize
-  exprs.norm <- rowNorm(exprs.mat)
+  exprs.norm <- PLIER::rowNorm(exprs.mat)
   
   # what should we set the minimum k parameter to in PLIER? estimate the number 
   # of PC for the SVD decomposition 
-  set.k <- num.pc(exprs.norm[cm.genes, ])
+  set.k <- PLIER::num.pc(exprs.norm[cm.genes, ])
   
   # PLIER main function + return results
-  plier.res <- PLIER(exprs.norm[cm.genes, ], all.paths[cm.genes, ], 
-                     k = round((set.k + set.k*0.3), 0), trace = TRUE)
+  plier.res <- PLIER::PLIER(exprs.norm[cm.genes, ], all.paths[cm.genes, ], 
+                            k = round((set.k + set.k*0.3), 0), trace = TRUE)
   
   return(plier.res)
   
@@ -51,7 +54,7 @@ GetOrderedRowNorm <- function(exprs.mat, plier.model) {
   # training data, set missing genes to zero (the mean), and reorder to match
   # plier.model$Z
   # 
-  # This makes the input gene expression data suitable for projection (?) into
+  # This makes the input gene expression data suitable for projection into
   # the training latent variable space (see GetNewDataB) and for evaluating 
   # reconstruction (MASE, correlation)
   # 
@@ -122,15 +125,19 @@ GetNewDataB <- function(exprs.mat, plier.model) {
   #                for each sample from the new dataset (exprs.mat), 
   # 
   require(PLIER)
+  
   # the error handling for reordering failing is now in GetOrderedRowNorm 
   ord.rownorm <- GetOrderedRowNorm(exprs.mat, plier.model) 
+  
   # get Z matrix from PLIER model
   z.mat <- plier.model$Z
+  
   # get LV by sample (B) matrix from the new exprs using PLIER model
   # https://github.com/wgmao/PLIER/blob/a2d4a2aa343f9ed4b9b945c04326bebd31533d4d/R/Allfuncs.R#L465
   exprs.new.b <-
     solve(t(z.mat) %*% z.mat + plier.model$L2 * diag(ncol(z.mat))) %*%
     t(z.mat) %*% ord.rownorm
+  
   # add in the rownames from the PLIER model B matrix
   rownames(exprs.new.b) <- rownames(plier.model$B)
   # return B matrix
@@ -357,7 +364,7 @@ CalculateUSparsity <- function(plier.results, significant.only = FALSE,
         prop.vector[col.iter] <- 
           sum(summary.df$`LV index` == col.iter) / no.entries
       } else {  # no significant pathways associated with this LV
-        prop.vector[col.iter] <- 0 / no.entries
+        prop.vector[col.iter] <- 0
       }
     }
   } else {
