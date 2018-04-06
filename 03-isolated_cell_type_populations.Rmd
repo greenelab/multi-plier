@@ -112,23 +112,33 @@ col.colors.vec[grep("CD14", colnames(iso.b.matrix))] <- "#000000"
 col.colors.vec[grep("CD16", colnames(iso.b.matrix))] <- "#32CD32"
 
 # heatmap
-hm <- gplots::heatmap.2(iso.b.matrix[indx.relevant.lv, ], 
+gplots::heatmap.2(iso.b.matrix[indx.relevant.lv, ], 
                         trace = "none",
                         col = colorRampPalette(c("blue", "white", "red")),
-                        cexCol = 0.35, cexRow = 0.25,
+                        cexCol = 0.5, cexRow = 0.6,
                         RowSideColors = row.colors.vec,
-                        ColSideColors = col.colors.vec)
+                        ColSideColors = col.colors.vec,
+                        margins = c(6, 10))
+legend("topright", 
+       legend = c("CD4 T cell", "CD14, monocyte", "CD16, neutrophil"),
+       col = c("#1E90EF", "#000000", "#32CD32"), cex = 0.5,
+       lty = 1, lwd = 6)
 ```
 ```{r}
 # save heatmap as pdf -- can not figure out another way around this, hm just
 # returns a list
 pdf(file.path(plot.dir, "E-MTAB-2452_recount_PLIER_cell_type_LVs_B.pdf"))
 gplots::heatmap.2(iso.b.matrix[indx.relevant.lv, ], 
-                  trace = "none",
-                  col = colorRampPalette(c("blue", "white", "red")),
-                  cexCol = 0.35, cexRow = 0.25,
-                  RowSideColors = row.colors.vec,
-                  ColSideColors = col.colors.vec)
+                        trace = "none",
+                        col = colorRampPalette(c("blue", "white", "red")),
+                        cexCol = 0.5, cexRow = 0.6,
+                        RowSideColors = row.colors.vec,
+                        ColSideColors = col.colors.vec,
+                        margins = c(6, 10))
+legend("topright", 
+       legend = c("CD4 T cell", "CD14, monocyte", "CD16, neutrophil"),
+       col = c("#1E90EF", "#000000", "#32CD32"), cex = 0.5,
+       lty = 1, lwd = 6)
 dev.off()
 ```
 
