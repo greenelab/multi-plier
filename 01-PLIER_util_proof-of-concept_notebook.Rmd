@@ -1,0 +1,153 @@
+---
+title: "PLIER Utils proof-of-concept"
+output:
+  html_notebook: default
+  pdf_document: default
+---
+**J. Taroni 2018** 
+
+In this notebook, I aim to demonstrate the validity of implementation for a 
+subset of PLIER custom functions. Specifically, checking the operations for:
+
+* Training a PLIER model on a new dataset `PLIERNewData()`
+* Applying a previously computed PLIER to a new dataset to get the LV x sample
+  matrix (B) `GetNewDataB()`
+* Reconstruction of input gene expression data with a PLIER model 
+  `GetReconstructedExprs()` and the evaluation function 
+  `GetReconstructionCorrelation()`
+
+Here, I use the **NARES dataset** for convenience due to its relatively small 
+size (n = 77). 
+
+#### Load libraries and custom functions
+```{r}
+library(AnnotationDbi)
+library(PLIER)
+
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plots directory specifically for this notebook
+dir.create(file.path("plots", "01"), recursive = TRUE,
+           showWarnings = FALSE)
+```
+
+
+#### NARES expression data
+
+```{r}
+# Read in PCL
+nares.data <- readr::read_tsv(file.path("data", "expression_data", 
+                                         "NARES_SCANfast_ComBat.pcl"),
+                              progress = FALSE)
+```
+Building a PLIER model requires HGNC symbol annotation, as this is what is
+included in the prior information (e.g., pathways, genesets) that is included
+in the package.
+
+```{r}
+symbol.obj <- org.Hs.eg.db::org.Hs.egSYMBOL
+mapped.genes <- AnnotationDbi::mappedkeys(symbol.obj)
+symbol.list <- as.list(symbol.obj[mapped.genes])
+symbol.df <- as.data.frame(cbind(names(symbol.list), unlist(symbol.list)))
+colnames(symbol.df) <- c("EntrezID", "GeneSymbol")
+
+# get gene column name to match to facilitate use with dplyr
+colnames(nares.data)[1] <- "EntrezID"
+
+# matching types
+symbol.df$EntrezID <- as.integer(as.character(symbol.df$EntrezID))
+
+# inner join
+annot.nares.data <- dplyr::inner_join(symbol.df, nares.data, by = "EntrezID")
+
+# only leave the matrix with gene symbol as rownames
+exprs.mat <- dplyr::select(annot.nares.data, -EntrezID)
+rownames(exprs.mat) <- exprs.mat$GeneSymbol
+exprs.mat <- as.matrix(dplyr::select(exprs.mat, -GeneSymbol))
+```
+
+#### Train PLIER model
+
+`PLIERNewData` is a wrapper function for applying PLIER to a new dataset. 
+Expression data is row-normalized for use with PLIER.
+We use the following genesets that come with PLIER: `bloodCellMarkersIRISDMAP`, 
+`svmMarkers`, and `canonicalPathways`.
+See also the [PLIER vignette](https://github.com/wgmao/PLIER/blob/a2d4a2aa343f9ed4b9b945c04326bebd31533d4d/vignettes/vignette.pdf).
+
+```{r}
+nares.plier <- PLIERNewData(exprs.mat)
+```
+
+#### Apply PLIER model to "new" expression dataset
+
+The `GetNewDataB` function will first row-normalize and reorder the "new" input 
+gene expression data (`exprs.mat`), and then using a previously computed PLIER 
+model (`plier.model`, specifically the gene loadings and the L2 constant), get
+the new data into the PLIER model LV space. Here, we supply the NARES data as
+the expression data and the PLIER model that has already been trained on the
+same gene expression matrix.
+
+```{r}
+new.b.mat <- GetNewDataB(exprs.mat = exprs.mat,
+                         plier.model = nares.plier)
+# NARES B matrix from PLIERNewData
+nares.b.mat <- nares.plier$B
+```
+We want to ensure that the two B matrices are the same.
+
+```{r}
+all.equal(nares.b.mat, new.b.mat)
+```
+
+#### Reconstruction of gene expression data
+
+We reconstruct gene expression data from the gene loadings and LVs.
+
+```{r}
+nares.recon <- GetReconstructedExprs(z.matrix = as.matrix(nares.plier$Z),
+                                     b.matrix = as.matrix(nares.plier$B))
+```
+
+Let's evaluate the reconstruction. 
+We'll need the row-normalized NARES expression data (input) for comparison.
+
+```{r}
+nares.rownorm <- PLIER::rowNorm(exprs.mat)
+nares.rownorm <- nares.rownorm[rownames(nares.recon), ]
+```
+
+Spearman correlation between input, row-normalized expression data and the
+reconstructed data.
+If correlation between the input and the reconstructed data is high, that
+suggests that reconstruction is "successful." 
+Given the different constraints in PLIER, we would not expect to perfectly 
+(`rho = 1`) reconstruct the input data.
+This particular evaluation will be _most useful_ when we look at applying a
+trained PLIER model to a test dataset.
+```{r}
+recon.correlation <- GetReconstructionCorrelation(true.mat = nares.rownorm,
+                                                  recon.mat = nares.recon)
+```
+
+Plot density
+```{r}
+# density plot
+p <- ggplot2::ggplot(as.data.frame(recon.correlation), 
+                ggplot2::aes(x = recon.correlation)) + 
+      ggplot2::geom_density() +
+      ggplot2::theme_bw() +
+      ggplot2::labs(x = "Spearman Correlation",
+                    title = "Input vs. PLIER reconstructed NARES data") +
+      ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                        face = "bold"))
+p
+```
+
+```{r}
+png.file <- file.path("plots", "01",
+                      "NARES_reconstructed_data_correlation_density.png")
+ggplot2::ggsave(filename = png.file, plot = p, width = 7, height = 5,
+                units = "in")
+```
