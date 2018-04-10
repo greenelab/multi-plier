@@ -274,7 +274,6 @@ sig.recon.error <- GetReconstructionMASE(true.mat = recount.input.exprs,
 # calculate correlation 
 sig.recon.cor <- GetReconstructionCorrelation(true.mat = recount.input.exprs,
                                               recon.mat = sig.recon)
-
 ```
 
 #### Plotting
@@ -282,12 +281,12 @@ sig.recon.cor <- GetReconstructionCorrelation(true.mat = recount.input.exprs,
 ```{r}
 # tidy format
 recon.eval.df <- 
-  rbind(cbind(recon.error, recon.cor, 
+  rbind(cbind(colnames(recount.input.exprs), recon.error, recon.cor, 
               rep(paste("All, n =", num.lvs), length(recon.error))),
-        cbind(sig.recon.error, sig.recon.cor, 
+        cbind(colnames(recount.input.exprs), sig.recon.error, sig.recon.cor, 
               rep(paste("Pathway-associated, n =", length(sig.lvs)), 
                           length(sig.recon.error))))
-colnames(recon.eval.df) <- c("MASE", 
+colnames(recon.eval.df) <- c("Sample", "MASE", 
                              "Spearman correlation",
                              "LVs used in reconstruction")
 recon.eval.df <- 
