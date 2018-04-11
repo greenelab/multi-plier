@@ -95,6 +95,7 @@ dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
 gs.file <- file.path("data", "expression_data", 
                      "E-MTAB-2452_hugene11st_SCANfast_with_GeneSymbol.pcl")
 exprs.df <-readr::read_tsv(gs.file)
+# drop gene identifiers
 exprs.mat <- as.matrix(exprs.df[, 3:ncol(exprs.df)])
 rownames(exprs.mat) <- exprs.df$GeneSymbol
 rm(exprs.df)
@@ -395,6 +396,7 @@ dplyr::filter(eval.df, Dataset == "E-MTAB-2452") %>%
                                y = `Spearman correlation`)) +
   ggplot2::geom_boxplot() +
   ggplot2::theme_bw() +
+  
   ggplot2::ggtitle("E-MTAB-2452 reconstruction with recount2 model")
 ```
 ```{r}
@@ -409,6 +411,8 @@ dplyr::filter(eval.df, Dataset == "E-MTAB-2452") %>%
                                y = MASE)) +
   ggplot2::geom_boxplot() +
   ggplot2::theme_bw() +
+  ggplot2::scale_x_discrete(labels = c("All", "Not pathway-associated", 
+                                       "Pathway-associated")) +
   ggplot2::ggtitle("E-MTAB-2452 reconstruction with recount2 model")
 ```
 ```{r}
