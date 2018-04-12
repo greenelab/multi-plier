@@ -31,7 +31,7 @@ ReconstructionEvalWrapper <- function(z.mat, b.mat, input.exprs,
   # performed. Finally, it returns a tidy data.frame of these measures.
   # See also: the compare reconstructed to input section of util/plier_util.R
   #
-  # Args:
+  # Args: 
   #   z.mat: a matrix of gene loadings from PLIER
   #   b.mat: a matrix of latent variables from PLIER
   #   input.exprs: gene expression matrix before reconstruction (input into 
@@ -317,8 +317,9 @@ head(recount.recon.non.df)
 
 ```{r}
 srp.non.df <- recount.recon.non.df %>%
-            dplyr::filter(grepl("SRP045500", recount.recon.non.df$Sample)) %>%
-            dplyr::mutate(Dataset = "SRP045500")
+                dplyr::filter(grepl("SRP045500", 
+                                    recount.recon.non.df$Sample)) %>%
+                dplyr::mutate(Dataset = "SRP045500")
 recount.recon.non.df <- dplyr::bind_rows(recount.recon.non.df, srp.non.df)
 ```
 
@@ -389,14 +390,19 @@ ggplot2::ggsave(filename = plot.file, plot = ggplot2::last_plot(),
 
 ### E-MTAB-2452 Boxplots
 
+```{r}
+array.eval.df <- dplyr::filter(eval.df, Dataset == "E-MTAB-2452")
+```
+
 #### Correlation
 ```{r}
-dplyr::filter(eval.df, Dataset == "E-MTAB-2452") %>%
-  ggplot2::ggplot(ggplot2::aes(x = `LVs used in reconstruction`,
-                               y = `Spearman correlation`)) +
+ggplot2::ggplot(array.eval.df, 
+                ggplot2::aes(x = `LVs used in reconstruction`,
+                             y = `Spearman correlation`)) +
   ggplot2::geom_boxplot() +
   ggplot2::theme_bw() +
-  
+  ggplot2::scale_x_discrete(labels = c("All", "Not pathway-associated", 
+                                       "Pathway-associated")) +
   ggplot2::ggtitle("E-MTAB-2452 reconstruction with recount2 model")
 ```
 ```{r}
@@ -404,11 +410,17 @@ plot.file <- file.path(plot.dir,
                        "E-MTAB-2452_reconstruction_corr_recount2_model.pdf")
 ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
 ```
+
+```{r}
+pairwise.t.test(x = array.eval.df$`Spearman correlation`,
+                g = array.eval.df$`LVs used in reconstruction`,
+                p.adjust.method = "bonferroni")
+```
+
 #### Error
 ```{r}
-dplyr::filter(eval.df, Dataset == "E-MTAB-2452") %>%
-  ggplot2::ggplot(ggplot2::aes(x = `LVs used in reconstruction`,
-                               y = MASE)) +
+ggplot2::ggplot(array.eval.df, 
+                ggplot2::aes(x = `LVs used in reconstruction`, y = MASE)) +
   ggplot2::geom_boxplot() +
   ggplot2::theme_bw() +
   ggplot2::scale_x_discrete(labels = c("All", "Not pathway-associated", 
@@ -419,6 +431,11 @@ dplyr::filter(eval.df, Dataset == "E-MTAB-2452") %>%
 plot.file <- file.path(plot.dir,
                        "E-MTAB-2452_reconstruction_error_recount2_model.pdf")
 ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+```{r}
+pairwise.t.test(x = array.eval.df$MASE,
+                g = array.eval.df$`LVs used in reconstruction`,
+                p.adjust.method = "bonferroni")
 ```
 
 ## Summary
