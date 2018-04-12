@@ -25,11 +25,12 @@ source(file.path("util", "plier_util.R"))
 ```
 
 ```{r}
-# plots directory specifcally for this notebook
+# plot and result directory setup for this notebook
 plot.dir <- file.path("plots", "02")
 dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "02")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
 ```
-
 
 ## Load data
 ```{r}
@@ -137,6 +138,11 @@ We reconstruct gene expression data from the gene loadings and LVs.
 # reconstructed recount2 expression data from PLIER model
 recount.recon <- GetReconstructedExprs(z.matrix = as.matrix(plier.results$Z),
                                        b.matrix = as.matrix(plier.results$B))
+# write reconstructed expression to results
+recon.mat.file <- file.path(results.dir, 
+                            "recount2_recount2_model_recon_exprs.RDS")
+saveRDS(recount.recon, file = recon.mat.file)
+
 # input expression data from intermediate file
 recount.input.exprs <- recount.list$rpkm.cm
 ```
@@ -249,6 +255,10 @@ sig.b.mat <- b.mat[as.integer(sig.lvs), ]
 # the reconstruction itself only with significant LVs
 sig.recon <- GetReconstructedExprs(z.matrix = sig.z.mat,
                                    b.matrix = sig.b.mat)
+# write to results
+sig.recon.mat.file <- 
+  file.path(results.dir, "recount2_recount2_model_sig_lvs_recon_exprs.RDS")
+saveRDS(sig.recon, file = sig.recon.mat.file)
 ```
 
 #### Reconstruction error
@@ -264,7 +274,6 @@ sig.recon.error <- GetReconstructionMASE(true.mat = recount.input.exprs,
 # calculate correlation 
 sig.recon.cor <- GetReconstructionCorrelation(true.mat = recount.input.exprs,
                                               recon.mat = sig.recon)
-
 ```
 
 #### Plotting
@@ -272,12 +281,12 @@ sig.recon.cor <- GetReconstructionCorrelation(true.mat = recount.input.exprs,
 ```{r}
 # tidy format
 recon.eval.df <- 
-  rbind(cbind(recon.error, recon.cor, 
+  rbind(cbind(colnames(recount.input.exprs), recon.error, recon.cor, 
               rep(paste("All, n =", num.lvs), length(recon.error))),
-        cbind(sig.recon.error, sig.recon.cor, 
+        cbind(colnames(recount.input.exprs), sig.recon.error, sig.recon.cor, 
               rep(paste("Pathway-associated, n =", length(sig.lvs)), 
                           length(sig.recon.error))))
-colnames(recon.eval.df) <- c("MASE", 
+colnames(recon.eval.df) <- c("Sample", "MASE", 
                              "Spearman correlation",
                              "LVs used in reconstruction")
 recon.eval.df <- 
@@ -286,6 +295,10 @@ recon.eval.df <-
                   `Spearman correlation` = 
                     as.numeric(as.character(`Spearman correlation`)))
 
+recon.eval.file <- file.path(results.dir,
+                             "recount2_recount2_model_recon_eval_df.tsv")
+readr::write_tsv(recon.eval.df,
+                 path = recon.eval.file )
 ```
 
 

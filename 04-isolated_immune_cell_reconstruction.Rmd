@@ -1,0 +1,466 @@
+---
+title: "Isolated immune cell reconstruction"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+**J. Taroni 2018**
+
+In this notebook, we'll be evaluating reconstruction of [`E-MTAB-2452`](https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-2452/) 
+sorted peripheral blood cells (CD4+ T cells, CD14+ monocytes, CD16+ neutrophils)
+profiled on microarray from several autoimmune diseases.
+as compared to isolated immune cell data included in the recount2.
+[`SRP045500`](https://trace.ncbi.nlm.nih.gov/Traces/sra/?study=SRP045500) is a 
+comparison of 6 cell subsets in "immune-associated diseases."
+
+## Functions and directory set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+# custom functions
+source(file.path("util", "plier_util.R"))
+```
+```{r}
+# Noticed I needed this functionality repeatedly
+ReconstructionEvalWrapper <- function(z.mat, b.mat, input.exprs,
+                                      dataset.name, lv.type = "All") {
+  # This function is a wrapper for reconstructing gene expression data given
+  # gene loadings (Z) and LVs (B) from a PLIER model. It also takes the
+  # input expression data so evaluations (Spearman correlation & MASE) can be
+  # performed. Finally, it returns a tidy data.frame of these measures.
+  # See also: the compare reconstructed to input section of util/plier_util.R
+  #
+  # Args: 
+  #   z.mat: a matrix of gene loadings from PLIER
+  #   b.mat: a matrix of latent variables from PLIER
+  #   input.exprs: gene expression matrix before reconstruction (input into 
+  #               PLIER), used as the `true.mat` argument for the reconstruction
+  #               evaluations (should be row-normalized, can use
+  #               GetOrderedRowNorm to obtain this matrix)
+  #   dataset.name: a string that indicates the dataset being reconstructed,
+  #                 this will end up being the value in the `Dataset` column of
+  #                 data.frame returned by this function
+  #   lv.type: a string that indicates what LVs were use for reconstruction,
+  #            this will end up being the value in the 
+  #            `LVs used in reconstruction` column of the data.frame returned
+  #
+  # Returns:
+  #   recon.eval.df: A data.frame with the following columns - Sample, MASE, 
+  #                  Spearman correlation, LVs used in reconstruction, Dataset
+  #
+  
+  ## Reconstruction
+  recon.exprs <- GetReconstructedExprs(z.matrix = z.mat, 
+                                       b.matrix = b.mat)
+  
+  ## Evaluations
+  recon.error <- GetReconstructionMASE(true.mat = input.exprs,
+                                       recon.mat = recon.exprs)
+  recon.cor <- GetReconstructionCorrelation(true.mat = input.exprs,
+                                            recon.mat = recon.exprs)
+  
+  ## get data.frame
+  num.samples <- ncol(input.exprs)
+  recon.eval.df <- as.data.frame(cbind(colnames(input.exprs), 
+                                       recon.error, recon.cor, 
+                                       rep(lv.type, num.samples), 
+                                       rep(dataset.name, num.samples)))
+  colnames(recon.eval.df) <- c("Sample", "MASE", "Spearman correlation",
+                               "LVs used in reconstruction", "Dataset")
+  recon.eval.df <- recon.eval.df %>%
+                    dplyr::mutate(MASE = as.numeric(as.character(MASE)),
+                    `Spearman correlation` = 
+                      as.numeric(as.character(`Spearman correlation`)))
+  
+  return(recon.eval.df)
+}
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "04")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "04")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Load data
+
+### E-MTAB-2452
+
+#### Expression data
+
+```{r}
+gs.file <- file.path("data", "expression_data", 
+                     "E-MTAB-2452_hugene11st_SCANfast_with_GeneSymbol.pcl")
+exprs.df <-readr::read_tsv(gs.file)
+# drop gene identifiers
+exprs.mat <- as.matrix(exprs.df[, 3:ncol(exprs.df)])
+rownames(exprs.mat) <- exprs.df$GeneSymbol
+rm(exprs.df)
+```
+
+#### B matrix
+
+From recount2 model
+
+```{r}
+iso.b.file <- file.path("results", "03", 
+                        "E-MTAB-2452_B_matrix_recount2_model.txt")
+iso.b.matrix <- read.delim(iso.b.file)
+```
+
+### recount2
+
+#### PLIER model
+
+```{r}
+plier.results <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+#### Input expression data
+
+```{r}
+# data that was prepped for use with PLIER
+recount.list <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                  "recount_data_prep_PLIER.RDS"))
+# input expression data from intermediate file
+recount.input.exprs <- recount.list$rpkm.cm
+rm(recount.list)
+```
+
+#### Evaluation of reconstruction
+
+Spearman correlation, MASE
+
+```{r}
+eval.file <- file.path("results", "02", 
+                       "recount2_recount2_model_recon_eval_df.tsv")
+recount.eval.df <- readr::read_tsv(eval.file)
+recount.eval.df$Dataset <- rep("recount2", nrow(recount.eval.df))
+```
+
+Identify the samples that belong to `SRP045500`, we'll duplicate these values
+in `recount.eval.df` so we can plot them separately.
+
+```{r}
+srp.df <- recount.eval.df %>%
+            dplyr::filter(grepl("SRP045500", recount.eval.df$Sample)) %>%
+            dplyr::mutate(Dataset = "SRP045500")
+recount.eval.df <- dplyr::bind_rows(recount.eval.df, srp.df)
+```
+
+## Reconstruction of E-MTAB-2452 with all LVs
+
+```{r}
+# recount2 model Z matrix
+z.matrix <- plier.results$Z
+```
+
+### Reconstruction and evaluation
+
+We need to obtain a (row-normalized) gene expression matrix as the "true"
+expression matrix. 
+We use this for evaluation with Spearman and MASE as in previous notebooks.
+We'll use this for the other evaluations (e.g., pathway-associated LVs only) as 
+well.
+
+```{r}
+iso.ord.rownorm <- GetOrderedRowNorm(exprs.mat = exprs.mat,
+                                     plier.model = plier.results)  #recount2
+```
+
+```{r}
+iso.recon.all.df <- ReconstructionEvalWrapper(z.mat = as.matrix(z.matrix),
+                                              b.mat = as.matrix(iso.b.matrix),
+                                              input.exprs = iso.ord.rownorm,
+                                              lv.type = paste("All, n =", 
+                                                              ncol(z.matrix)),
+                                              dataset.name = "E-MTAB-2452")
+```
+
+```{r}
+head(iso.recon.all.df)
+```
+### Plotting 
+
+Add the isolated cell type reconstruction evaluation measures to the recount
+data.frame
+
+```{r}
+eval.df <- dplyr::bind_rows(recount.eval.df, iso.recon.all.df)
+rm(iso.recon.all.df)
+```
+#### Correlation
+```{r}
+dplyr::filter(eval.df, `LVs used in reconstruction` == 
+                paste("All, n =", ncol(z.matrix))) %>%
+  ggplot2::ggplot(ggplot2::aes(x = `Spearman correlation`,
+                               group = Dataset, fill = Dataset)) +
+  ggplot2::geom_density(alpha = 0.3) +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("white", "gray50", "black")) +
+  ggplot2::ggtitle(paste("All, n =", ncol(z.matrix)))
+```
+
+#### MASE
+```{r}
+dplyr::filter(eval.df, `LVs used in reconstruction` == 
+                paste("All, n =", ncol(z.matrix))) %>%
+  ggplot2::ggplot(ggplot2::aes(x = MASE,
+                               group = Dataset, fill = Dataset)) +
+  ggplot2::geom_density(alpha = 0.3) +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("white", "gray50", "black")) +
+  ggplot2::ggtitle(paste("All, n =", ncol(z.matrix)))
+```
+
+### Summary
+
+The isolated immune cell samples (`SRP045500`) are among some of the best 
+reconstructed (high correlation, low error) in the recount2 compendium.
+`E-MTAB-2452`, the microarray dataset, is reconstructed relatively poorly. 
+This is unsurprising, as it was not included in training and is from a different
+technology.
+We'll look next at reconstruction using _subsets_ of the recount2 PLIER model
+LVs. 
+Specifically, we hypothesize that reconstruction using only pathway-associated
+LVs (e.g., those LVs rooted in biological signal) may make the measures of
+reconstruction performance -- correlation and error -- more similar between
+the two isolated immune cell datasets.
+If this is the case, it supports the idea that the PLIER-learned LVs that are 
+not associated with pathways are, at least in part, capturing variation that
+can be attributed to technical factors.
+We would expect that the technical signals in recount2 would be distinct 
+(e.g., an LV associated with library prep strategy) from what's in 
+`E-MTAB-2452` and, therefore, that including this information may negatively 
+impact reconstruction of this dataset.
+
+## Reconstruction of E-MTAB-2452 with pathway-associated LVs only
+
+```{r}
+# Get the significant LVs (from recount2 model) using 0.05 as the FDR cutoff
+plier.summary <- plier.results$summary
+sig.summary <- plier.summary %>%
+                  dplyr::filter(FDR < 0.05)
+sig.lvs <- unique(sig.summary$`LV index`)
+```
+
+```{r}
+# drop columns (LVs) from Z that are not significantly associated with prior 
+# info
+sig.z.mat <- z.matrix[, as.integer(sig.lvs)]
+# drop rows (LVs) from E-MTAB-2452 B that are not significantly associated with 
+# prior info
+iso.sig.b.mat <- as.matrix(iso.b.matrix[as.integer(sig.lvs), ])
+```
+
+### Reconstruction and evaluation
+
+```{r}
+path.lv.type <- paste("Pathway-associated, n =", ncol(sig.z.mat))
+iso.recon.sig.df <- ReconstructionEvalWrapper(z.mat = as.matrix(sig.z.mat),
+                                              b.mat = iso.sig.b.mat,
+                                              input.exprs = iso.ord.rownorm,
+                                              dataset.name = "E-MTAB-2452",
+                                              lv.type = path.lv.type)
+head(iso.recon.sig.df)
+```
+Add to rest of evaluations
+
+```{r}
+eval.df <- dplyr::bind_rows(eval.df, iso.recon.sig.df)
+rm(iso.recon.sig.df)
+```
+
+## Reconstruction with LVs that are not associated with pathways
+
+Here, we'll have to reconstruct the recount2 data with the LVs that are not
+significantly associated with pathways, as we did not perform this analysis
+in `02-recount2_PLIER_exploration`.
+
+```{r}
+# some LVs don't even make it to the summary data.frame from the PLIER model
+# the LVs we want here are *all* the LVs that do not have at least one pathway 
+# significantly associated with them
+all(1:nrow(plier.results$B) %in% unique(plier.summary$`LV index`))
+```
+
+```{r}
+# non-significant LVs, then, are all LVs that are not in the list of 
+# pathway-associated LVs
+non.lvs <- setdiff(1:nrow(plier.results$B), as.integer(sig.lvs))
+```
+```{r}
+# z matrix for just these LVs
+non.z.mat <- z.matrix[, as.integer(non.lvs)]
+```
+### recount2
+
+```{r}
+# get B matrix
+non.b.mat <- as.matrix(plier.results$B[as.integer(non.lvs), ])
+# reconstruction & evaluation 
+non.lv.type <- paste("LVs not associated with pathway, n =", length(non.lvs))
+recount.recon.non.df <- 
+  ReconstructionEvalWrapper(z.mat = as.matrix(non.z.mat),
+                            b.mat = non.b.mat,
+                            input.exprs = recount.input.exprs,
+                            lv.type = non.lv.type,
+                            dataset.name = "recount2")
+head(recount.recon.non.df)
+```
+
+#### SRP045500
+
+```{r}
+srp.non.df <- recount.recon.non.df %>%
+                dplyr::filter(grepl("SRP045500", 
+                                    recount.recon.non.df$Sample)) %>%
+                dplyr::mutate(Dataset = "SRP045500")
+recount.recon.non.df <- dplyr::bind_rows(recount.recon.non.df, srp.non.df)
+```
+
+```{r}
+eval.df <- dplyr::bind_rows(eval.df, recount.recon.non.df)
+rm(recount.recon.non.df, srp.non.df)
+```
+
+### E-MTAB-2452
+
+```{r}
+# get b matrix
+iso.non.b.mat <- as.matrix(iso.b.matrix[as.integer(non.lvs), ])
+# reconstruction & evaluation 
+iso.recon.non.df <- 
+  ReconstructionEvalWrapper(z.mat = as.matrix(non.z.mat),
+                            b.mat = iso.non.b.mat,
+                            input.exprs = iso.ord.rownorm,
+                            lv.type = non.lv.type,
+                            dataset.name = "E-MTAB-2452")
+head(iso.recon.non.df)
+```
+
+```{r}
+eval.df <- dplyr::bind_rows(eval.df, iso.recon.non.df)
+rm(iso.recon.non.df)
+```
+
+## Plotting
+
+Plot all three conditions on the same plot for easy comparison
+
+### Density
+
+#### Correlation 
+```{r}
+ggplot2::ggplot(eval.df,
+  ggplot2::aes(x = `Spearman correlation`, group = Dataset, fill = Dataset)) +
+  ggplot2::facet_wrap(~ `LVs used in reconstruction`, ncol = 1) +
+  ggplot2::geom_density(alpha = 0.3) +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("white", "gray50", "black"))
+```
+
+```{r}
+plot.file <- file.path(plot.dir, 
+                       "recount2_model_isolated_cell_recon_correlation.pdf")
+ggplot2::ggsave(filename = plot.file, plot = ggplot2::last_plot(),
+                height = 11, width = 8.5)
+```
+
+#### Error
+```{r}
+ggplot2::ggplot(eval.df,
+  ggplot2::aes(x = MASE, group = Dataset, fill = Dataset)) +
+  ggplot2::facet_wrap(~ `LVs used in reconstruction`, ncol = 1) +
+  ggplot2::geom_density(alpha = 0.3) +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("white", "gray50", "black"))
+```
+
+```{r}
+plot.file <- file.path(plot.dir, 
+                       "recount2_model_isolated_cell_recon_error.pdf")
+ggplot2::ggsave(filename = plot.file, plot = ggplot2::last_plot(),
+                height = 11, width = 8.5)
+```
+
+### E-MTAB-2452 Boxplots
+
+```{r}
+array.eval.df <- dplyr::filter(eval.df, Dataset == "E-MTAB-2452")
+```
+
+#### Correlation
+```{r}
+ggplot2::ggplot(array.eval.df, 
+                ggplot2::aes(x = `LVs used in reconstruction`,
+                             y = `Spearman correlation`)) +
+  ggplot2::geom_boxplot() +
+  ggplot2::theme_bw() +
+  ggplot2::scale_x_discrete(labels = c("All", "Not pathway-associated", 
+                                       "Pathway-associated")) +
+  ggplot2::ggtitle("E-MTAB-2452 reconstruction with recount2 model")
+```
+```{r}
+plot.file <- file.path(plot.dir,
+                       "E-MTAB-2452_reconstruction_corr_recount2_model.pdf")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+```{r}
+pairwise.t.test(x = array.eval.df$`Spearman correlation`,
+                g = array.eval.df$`LVs used in reconstruction`,
+                p.adjust.method = "bonferroni")
+```
+
+#### Error
+```{r}
+ggplot2::ggplot(array.eval.df, 
+                ggplot2::aes(x = `LVs used in reconstruction`, y = MASE)) +
+  ggplot2::geom_boxplot() +
+  ggplot2::theme_bw() +
+  ggplot2::scale_x_discrete(labels = c("All", "Not pathway-associated", 
+                                       "Pathway-associated")) +
+  ggplot2::ggtitle("E-MTAB-2452 reconstruction with recount2 model")
+```
+```{r}
+plot.file <- file.path(plot.dir,
+                       "E-MTAB-2452_reconstruction_error_recount2_model.pdf")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+```{r}
+pairwise.t.test(x = array.eval.df$MASE,
+                g = array.eval.df$`LVs used in reconstruction`,
+                p.adjust.method = "bonferroni")
+```
+
+## Summary
+
+Reconstruction of a test dataset, `E-MTAB-2452`, using only PLIER latent 
+variables that significantly associated with a pathway or gene set is 
+better in terms of both MASE and Spearman correlation than when using only
+latent variables that are not associated with any prior information.
+This is despite the fact that there are more non-significant LVs (`n = 788` vs.
+`n = 199`).
+However, neither of these subsets of LVs outperforms using all LVs
+and the performance gap between reconstructing `E-MTAB-2452` and `SRP045500` 
+(the sorted immune cell dataset included in recount2) is not considerably 
+reduced when using only pathway-associated LVs, which refutes our initial
+hypothesis.
+It's also interesting that, when reconstructing using only non-significant LVs, 
+the pre- and post-reconstruction correlation values are much more similar 
+between `E-MTAB-2452` and `SRP045500`.
+This suggests that the pathway-associated LVs are important for accurate
+reconstruction of the `SRP045500` dataset.
+
+_It's worth noting that these sorted immune cell datasets are from 
+patients with different diagnoses and contain different cell type populations 
+(in addition to different technologies) that may be more or less 
+well-represented in the recount2 compendium.
+We expect that these differences contribute to the results. 
+Future analyses may focus on a microarray dataset more comparable to `SRP045500`
+in these ways._
