@@ -210,6 +210,8 @@ sd.df <- readr::read_tsv(sd.file)
 ```{r}
 # PCA
 all.lv.pc <- prcomp(t(b.matrix))
+cum.var.exp <- cumsum(all.lv.pc$sdev^2 / sum(all.lv.pc$sdev^2))
+
 # PC1-2 in form suitable for ggplot2
 all.lv.df <- as.data.frame(cbind(rownames(all.lv.pc$x),
                                  all.lv.pc$x[, 1:2]))
@@ -233,7 +235,11 @@ all.plot <-
     ggplot2::geom_point(alpha = 0.5) +
     ggplot2::scale_color_manual(values = plot.color.pal) +
     ggplot2::theme_bw() +
-    ggplot2::labs(title = "All Latent Variables") +
+    ggplot2::labs(x = paste0("PC1 (cum var exp = ", 
+                             round(cum.var.exp[1], 3), ")"),
+                  y = paste0("PC2 (cum var exp = ", 
+                             round(cum.var.exp[2], 3), ")"), 
+                  title = "All Latent Variables") +
     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
                                                       face = "bold"))
 all.plot
@@ -243,6 +249,7 @@ all.plot
 ```{r}
 # PCA
 path.lv.pc <- prcomp(t(sig.b.mat))
+cum.var.exp <- cumsum(path.lv.pc$sdev^2 / sum(path.lv.pc$sdev^2))
 # PC1-2 in form suitable for ggplot2
 path.lv.df <- as.data.frame(cbind(rownames(path.lv.pc$x),
                                  path.lv.pc$x[, 1:2]))
@@ -264,12 +271,16 @@ path.lv.df <- dplyr::full_join(path.lv.df, sd.df, by = "SampleID") %>%
 path.plot <- 
   ggplot2::ggplot(path.lv.df, ggplot2::aes(x = PC1, y = PC2, 
                                            colour = Dataset)) +
-    ggplot2::geom_point(alpha = 0.5) +
-    ggplot2::scale_color_manual(values = plot.color.pal) +
-    ggplot2::theme_bw() +
-    ggplot2::labs(title = "Pathway-associated Latent Variables (AUC > 0.75)") +
-    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
-                                                      face = "bold"))
+  ggplot2::geom_point(alpha = 0.5) +
+  ggplot2::scale_color_manual(values = plot.color.pal) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = paste0("PC1 (cum var exp = ", 
+                           round(cum.var.exp[1], 3), ")"),
+                y = paste0("PC2 (cum var exp = ", 
+                           round(cum.var.exp[2], 3), ")"),
+                title = "Pathway-associated Latent Variables (AUC > 0.75)") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"))
 path.plot
 ```
 
@@ -277,6 +288,7 @@ path.plot
 ```{r}
 # PCA
 oth.lv.pc <- prcomp(t(oth.b.mat))
+cum.var.exp <- cumsum(oth.lv.pc$sdev^2 / sum(oth.lv.pc$sdev^2))
 # PC1-2 in form suitable for ggplot2
 oth.lv.df <- as.data.frame(cbind(rownames(oth.lv.pc$x),
                                  oth.lv.pc$x[, 1:2]))
@@ -300,7 +312,11 @@ oth.plot <-
     ggplot2::geom_point(alpha = 0.5) +
     ggplot2::scale_color_manual(values = plot.color.pal) +
     ggplot2::theme_bw() +
-    ggplot2::labs(title = "Latent Variables AUC <= 0.75") +
+    ggplot2::labs(x = paste0("PC1 (cum var exp = ", 
+                           round(cum.var.exp[1], 3), ")"),
+                  y = paste0("PC2 (cum var exp = ", 
+                           round(cum.var.exp[2], 3), ")"),
+                  title = "Latent Variables AUC <= 0.75") +
     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
                                                       face = "bold"))
 oth.plot
