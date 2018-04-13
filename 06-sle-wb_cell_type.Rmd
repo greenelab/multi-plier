@@ -239,7 +239,7 @@ germinal center.)
 
 ### LVs associated with plasma cell gene sets
 
-What LVs, if any, are significantly associated with the 
+What LVs, if any, are significantly associated with the plasma cell gene sets?
 
 ```{r}
 sle.summary %>%
