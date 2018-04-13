@@ -1,0 +1,352 @@
+---
+title: "SLE WB PLIER cell type analyses"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+**J. Taroni 2018**
+
+Part of the motivation behind using PLIER (particularly in a systemic lupus 
+erythematosus whole blood setting) is that we can automatically extract 
+information about cell type proportion variation. 
+One of the datasets included in the SLE WB compendium comes from 
+[Banchereau, et al.](https://doi.org/10.1016/j.cell.2016.03.008).
+The original publication contained some interesting findings about neutrophils 
+and plasmablasts.
+In this notebook, we explore whether latent variables from the PLIER model 
+trained on the SLE WB compendium associated with these cell type (gene sets) 
+show similar trends to what was found by Banchereau, et al.
+By extension, this also tells us whether the cell type-specific patterns are 
+retained following all the processing we did in 
+[`greenelab/rheum-plier-data/sle-wb`](https://github.com/greenelab/rheum-plier-data/tree/4be547553f24fecac9e2f5c2b469a17f9df253f0/sle-wb).
+
+## Functions and directory set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+library(PLIER)
+
+# custom functions
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "06")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "06")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+
+## Load data
+
+### PLIER model
+```{r}
+# SLE WB model trained in notebook 05
+model.file <- file.path("results", "05", "SLE-WB_PLIER_model.RDS")
+plier.results <- readRDS(model.file)
+# summary data.frame (pathway to LV info like AUC, FDR)
+sle.summary <- plier.results$summary
+# LVs
+b.matrix <- plier.results$B
+```
+
+### Banchereau, et al. Sample Data Relationship File
+```{r}
+# phenotype information 
+# read in sample data relationship file
+file.65391 <- file.path("data", "sample_info", "E-GEOD-65391.sdrf.txt")
+e.65391.sdrf <- readr::read_tsv(file.65391)
+# use Sample instead of Source Name
+colnames(e.65391.sdrf)[1] <- c("Sample")
+# get rid of trailing " 1" so they match the sample names from B matrix
+e.65391.sdrf$Sample <- gsub(" 1", "", e.65391.sdrf$Sample)
+```
+
+## Neutrophil signature
+
+### LVs associated with neutrophil gene sets
+
+```{r}
+sle.summary %>%
+  dplyr::filter(grepl("Neutrophil", pathway), 
+                FDR < 0.05)
+```
+Based on these results, we select `LV2`,`LV27`, `LV34`, and `LV87` 
+for further exploration.
+If these latent variables are also strongly associated with _other_ pathways or 
+cell types, that is not desirable. 
+That could make intepretation more difficult.
+
+```{r}
+sle.summary %>%
+  dplyr::filter(`LV index` == 2 |
+                  `LV index` == 27 |
+                  `LV index` == 34 |
+                  `LV index` == 87) %>%
+  dplyr::filter(FDR < 0.05) %>%
+  dplyr::arrange(`LV index`, desc(AUC))
+```
+
+Some notes on these results: 
+
+* `LV2` looks like it captures the myeloid lineage in a broad sense, as a
+monocyte gene set, `SVM Monocytes`, and a neutrophil progenitor gene set,
+`DMAP_GRAN2` (reported to be a neutrophilic metamyelocyte signature in
+the [DMAP paper](https://doi.org/10.1016/j.cell.2011.01.004)).
+
+* `LV27` and `LV34` also look like they may capture some information about
+monocytes because of their association with the `DMAP_MONO2` gene set.
+
+* `LV87` looks the most "neutrophil-specific" and therefore, the most desirable
+for this kind of analysis.
+
+#### U matrix
+
+```{r}
+PLIER::plotU(plierRes = plier.results,
+             pval.cutoff = 1e-06,
+             indexCol = c(2, 27, 34, 87),
+             top = 10)
+```
+```{r}
+png(file.path(plot.dir, "SLE_WB_neutrophil_Uplot.png"), 
+    res = 300, width = 7, height = 7, units = "in")
+PLIER::plotU(plierRes = plier.results,
+             pval.cutoff = 1e-06,
+             indexCol = c(2, 27, 34, 87),
+             top = 10)
+dev.off()
+```
+
+### Compare to neutrophil count from Banchereau, et al. 
+
+```{r}
+neutrophil.count.df <- e.65391.sdrf[, c("Sample", 
+                                        "Characteristics [neutrophil_count]")]
+colnames(neutrophil.count.df)[2] <- c("Neutrophil.Count")
+neutrophil.count.df <- 
+  neutrophil.count.df %>%
+  dplyr::filter(Neutrophil.Count != "Data Not Available") %>%
+  dplyr::filter(Neutrophil.Count != "Not Applicable")
+
+```
+
+
+```{r}
+# combine with neutrophil latent variables
+neutro.lv.df <- as.data.frame(cbind(colnames(b.matrix), 
+                                    t(b.matrix[c(2, 27, 34, 87), ])))
+colnames(neutro.lv.df) <- c("Sample", "LV2", "LV27", "LV34", "LV87")
+
+neutro.df <- dplyr::inner_join(neutro.lv.df, neutrophil.count.df,
+                               by = "Sample") %>%
+  dplyr::mutate(LV2 = as.numeric(as.character(LV2)),
+                LV27 = as.numeric(as.character(LV27)),
+                LV34 = as.numeric(as.character(LV34)),
+                LV87 = as.numeric(as.character(LV87)),
+                Neutrophil.Count = as.numeric(as.character(Neutrophil.Count)))
+neutro.df
+```
+
+```{r}
+# write to file, will use to compare to results with recount2
+count.file <- file.path(results.dir, 
+                        "Banchereau_count_SLE_model_neutrophil_LV.tsv")
+readr::write_tsv(neutro.df, path = count.file)
+```
+
+
+```{r}
+# function for scatter plots, given lv (a string indicating the LV of interest)
+# make a scatter plot where the LV is the x variable, neutrophil count is the
+# y variable & fit a line with geom_smooth(method = "lm")
+# needs to be used in this global environment
+LVScatter <- function(lv = "LV2") {
+  y.var <- "Neutrophil.Count"
+  ggplot2::ggplot(neutro.df, ggplot2::aes_string(x = lv, y = y.var)) +
+  ggplot2::geom_count() +
+  ggplot2::geom_smooth(method = "lm") +
+  ggplot2::theme_bw() +
+  ggplot2::labs(y = "Neutrophil Count") +
+  ggplot2::theme(legend.position = "none")
+}
+```
+
+#### LV2
+
+```{r}
+LVScatter(lv = "LV2")
+```
+
+```{r}
+summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV2))
+```
+
+#### LV27
+
+```{r}
+LVScatter(lv = "LV27")
+```
+
+```{r}
+summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV27))
+```
+
+#### LV34
+
+```{r}
+LVScatter(lv = "LV34")
+```
+
+```{r}
+summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV34))
+```
+
+#### LV87
+
+```{r}
+LVScatter(lv = "LV87")
+```
+
+```{r}
+summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV87))
+```
+
+When comparing the results to the recount2 model, we'll pursue `LV27` because 
+it's the best performing and `LV87` because of its lack of overlap with
+monocyte signatures.
+So, we'll save the plots for these two LVs.
+
+```{r}
+plot.file <- file.path(plot.dir, "Banchereau_neutrophil_count_LV27_scatter.png")
+ggplot2::ggsave(plot.file, plot = LVScatter("LV27"))
+plot.file <- file.path(plot.dir, "Banchereau_neutrophil_count_LV87_scatter.png")
+ggplot2::ggsave(plot.file, plot = LVScatter("LV87"))
+```
+
+## Plasma cell signature
+
+In Banchereau, et al., the authors demonstrated that plasmablast counts were 
+different between patients stratified by 3 disease activity (DA) groups. 
+
+While there were no _plasmablast_ gene sets given to PLIER during training, we 
+did use _plasma cell_ gene sets (isolated from PBMCs)
+(A plasmablast is a plasma cell precursor that is typically found in a
+germinal center.)
+
+### LVs associated with plasma cell gene sets
+
+What LVs, if any, are significantly associated with the 
+
+```{r}
+sle.summary %>%
+  dplyr::filter(grepl("Plasma", pathway), 
+                FDR < 0.05)
+```
+```{r}
+sle.summary %>% 
+  dplyr::filter(`LV index` == 52 |
+                 `LV index` == 136,
+                FDR < 0.05) %>%
+  dplyr::arrange(desc(AUC))
+```
+
+#### U matrix
+```{r}
+PLIER::plotU(plierRes = plier.results,
+             pval.cutoff = 1e-06,
+             indexCol = c(52, 136),
+             top = 10)
+```
+
+```{r}
+png(file.path(plot.dir, "SLE_WB_plasma_cell_Uplot.png"), 
+    res = 300, width = 7, height = 7, units = "in")
+PLIER::plotU(plierRes = plier.results,
+             pval.cutoff = 1e-06,
+             indexCol = c(52, 136),
+             top = 10)
+dev.off()
+```
+
+
+### Banchereau, et al. disease activity groups
+
+```{r}
+# get DA information from the sample-data relationship file
+da.group.df <- e.65391.sdrf[, c("Sample", "Characteristics [disease_activity]")]
+colnames(da.group.df)[2] <- "Disease.Activity"
+da.group.df <- da.group.df %>%
+              dplyr::filter(Disease.Activity != "Not Applicable")
+
+# plasma cell LV
+plasma.lv.df <- as.data.frame(cbind(colnames(b.matrix), 
+                                    t(b.matrix[c(52, 136), ])))
+colnames(plasma.lv.df) <- c("Sample", "LV52", "LV136")
+
+# join
+plasma.df <- dplyr::inner_join(plasma.lv.df, da.group.df) %>%
+  dplyr::mutate(Disease.Activity = dplyr::recode(Disease.Activity, 
+                                                 `1` = "DA1", 
+                                                 `2` = "DA2",
+                                                 `3` = "DA3"),
+                Disease.Activity = factor(Disease.Activity),
+                LV52 = as.numeric(as.character(LV52)),
+                LV136 = as.numeric(as.character(LV136))) 
+head(plasma.df)
+```
+
+```{r}
+# write to file, will be used to compare to recount2 model
+plasma.file <- file.path(results.dir, 
+                         "Banchereau_DA_group_SLE_model_plasma_cell_LVs.tsv")
+readr::write_tsv(plasma.df, path = plasma.file)
+```
+
+#### Plotting
+```{r}
+plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = LV52)) +
+  ggplot2::geom_boxplot(notch = TRUE) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity")
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "Banchereau_DA_group_LV52_boxplot.png")
+ggplot2::ggsave(filename = plot.file, plot = ggplot2::last_plot())
+```
+
+```{r}
+# check for statistical significance 
+# (pairwise t-test is consistent with original publication as far as I can tell)
+pairwise.t.test(x = plasma.df$LV52, 
+                g = plasma.df$Disease.Activity, 
+                p.adjust.method = "bonferroni")
+```
+
+```{r}
+plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = LV136)) +
+  ggplot2::geom_boxplot(notch = TRUE) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity")
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "Banchereau_DA_group_LV136_boxplot.png")
+ggplot2::ggsave(filename = plot.file, plot = ggplot2::last_plot())
+```
+
+```{r}
+# check for statistical significance 
+# (pairwise t-test is consistent with original publication as far as I can tell)
+pairwise.t.test(x = plasma.df$LV136, 
+                g = plasma.df$Disease.Activity, 
+                p.adjust.method = "bonferroni")
+```
