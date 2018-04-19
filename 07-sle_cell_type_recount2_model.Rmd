@@ -293,4 +293,72 @@ gridExtra::grid.arrange(sle.plot, recount.plot, ncol = 2)
 dev.off()
 ```
 
+### Plasma cell
+
+```{r}
+# get LV951 into data.frame form
+plasma.lv.df <- as.data.frame(cbind(colnames(sle.recount.b), 
+                                    sle.recount.b[951, ]))
+colnames(plasma.lv.df) <- c("Sample", "recount2_LV951")
+```
+
+```{r}
+# join with SLE WB results
+plasma.df <- dplyr::inner_join(sle.plasma.df, plasma.lv.df, by = "Sample") %>%
+  dplyr::mutate(recount2_LV951 = as.numeric(as.character(recount2_LV951)))
+head(plasma.df)
+```
+
+```{r}
+plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = recount2_LV951)) +
+  ggplot2::geom_boxplot(notch = TRUE) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity")
+```
+
+```{r}
+# check for statistical significance 
+# (pairwise t-test is consistent with original publication as far as I can tell)
+pairwise.t.test(x = plasma.df$recount2_LV951, 
+                g = plasma.df$Disease.Activity, 
+                p.adjust.method = "bonferroni")
+```
+
+This is highly similar to what we saw in `06-sle-wb_cell_type`.
+
+Now we'll plot the recount2 (`recount2_LV951`) and SLE WB model (`LV52`) 
+results side by side as we did above with the neutrophil scatterplots.
+
+```{r}
+sle.plot <- plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = LV52)) +
+  ggplot2::geom_boxplot(notch = TRUE) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity",
+                title = "SLE WB PLIER model") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"))
+```
+
+```{r}
+recount.plot <- plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = recount2_LV951)) +
+  ggplot2::geom_boxplot(notch = TRUE) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity",
+                title = "recount2 PLIER model") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"))
+```
+
+```{r}
+pdf(file.path(plot.dir, "Plasma_cell_LV_model_comparison.pdf"), width = 14,
+    height = 7)
+gridExtra::grid.arrange(sle.plot, recount.plot, ncol = 2)
+dev.off()
+```
 
