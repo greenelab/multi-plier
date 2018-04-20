@@ -82,10 +82,7 @@ That could make intepretation more difficult.
 
 ```{r}
 sle.summary %>%
-  dplyr::filter(`LV index` == 2 |
-                  `LV index` == 27 |
-                  `LV index` == 34 |
-                  `LV index` == 87) %>%
+  dplyr::filter(`LV index` %in% c(2, 27, 34, 87)) %>%
   dplyr::filter(FDR < 0.05) %>%
   dplyr::arrange(`LV index`, desc(AUC))
 ```
@@ -163,56 +160,71 @@ readr::write_tsv(neutro.df, path = count.file)
 # function for scatter plots, given lv (a string indicating the LV of interest)
 # make a scatter plot where the LV is the x variable, neutrophil count is the
 # y variable & fit a line with geom_smooth(method = "lm")
+# also will annotate the plot with the supplied r-squared value (rsq arg)
+# where the text is placed is automatically chosen from the x and y values
 # needs to be used in this global environment
-LVScatter <- function(lv = "LV2") {
+LVScatter <- function(lv, rsq) {
   y.var <- "Neutrophil.Count"
+  
+  # calculate where to put the r-squared value
+  x.range <- max(neutro.df[, lv]) - min(neutro.df[, lv])
+  x.coord <- min(neutro.df[, lv]) + (x.range * 0.15)
+  y.range <- max(neutro.df[, y.var]) - min(neutro.df[, y.var])
+  y.coord <- max(neutro.df[, y.var]) - (y.range * 0.15)
+  
   ggplot2::ggplot(neutro.df, ggplot2::aes_string(x = lv, y = y.var)) +
-  ggplot2::geom_count() +
-  ggplot2::geom_smooth(method = "lm") +
-  ggplot2::theme_bw() +
-  ggplot2::labs(y = "Neutrophil Count") +
-  ggplot2::theme(legend.position = "none")
+    ggplot2::geom_point(alpha = 0.7) +
+    ggplot2::geom_smooth(method = "lm") +
+    ggplot2::theme_bw() +
+    ggplot2::labs(y = "Neutrophil Count") +
+    ggplot2::theme(legend.position = "none", 
+                   text = ggplot2::element_text(size = 15)) +
+    ggplot2::annotate("text", x = x.coord, y = y.coord, 
+                      label = paste("r-squared =", rsq))
 }
 ```
 
 #### LV2
 
 ```{r}
-LVScatter(lv = "LV2")
-```
-
-```{r}
 summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV2))
 ```
 
-#### LV27
-
 ```{r}
-LVScatter(lv = "LV27")
+LVScatter(lv = "LV2", rsq = 0.12)
 ```
+
+
+
+#### LV27
 
 ```{r}
 summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV27))
 ```
 
-#### LV34
-
 ```{r}
-LVScatter(lv = "LV34")
+LVScatter(lv = "LV27", rsq = 0.38)
 ```
+
+
+#### LV34
 
 ```{r}
 summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV34))
 ```
 
+```{r}
+LVScatter(lv = "LV34", rsq = 0.29)
+```
+
 #### LV87
 
 ```{r}
-LVScatter(lv = "LV87")
+summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV87))
 ```
 
 ```{r}
-summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$LV87))
+LVScatter(lv = "LV87", rsq = 0.29)
 ```
 
 When comparing the results to the recount2 model, we'll pursue `LV27` because 
@@ -222,9 +234,9 @@ So, we'll save the plots for these two LVs.
 
 ```{r}
 plot.file <- file.path(plot.dir, "Banchereau_neutrophil_count_LV27_scatter.png")
-ggplot2::ggsave(plot.file, plot = LVScatter("LV27"))
+ggplot2::ggsave(plot.file, plot = LVScatter("LV27", rsq = 0.38))
 plot.file <- file.path(plot.dir, "Banchereau_neutrophil_count_LV87_scatter.png")
-ggplot2::ggsave(plot.file, plot = LVScatter("LV87"))
+ggplot2::ggsave(plot.file, plot = LVScatter("LV87", rsq = 0.29))
 ```
 
 ## Plasma cell signature
@@ -248,8 +260,7 @@ sle.summary %>%
 ```
 ```{r}
 sle.summary %>% 
-  dplyr::filter(`LV index` == 52 |
-                 `LV index` == 136,
+  dplyr::filter(`LV index` %in% c(52, 136),
                 FDR < 0.05) %>%
   dplyr::arrange(desc(AUC))
 ```
@@ -274,6 +285,14 @@ dev.off()
 
 
 ### Banchereau, et al. disease activity groups
+
+Disease activity was defined based on SLEDAI (SLE Disease Activity Index,
+[Bombardier, et al. 1992.](https://www.ncbi.nlm.nih.gov/pubmed/1599520)). 
+[Banchereau, et al.](https://doi.org/10.1016/j.cell.2016.03.008)
+defined the disease activity groups as follows:
+
+> Samples were categorized as DA1 (SLEDAI: 0–2), DA2 (SLEDAI: 3–7), or DA3 
+(SLEDAI > 7), based on SLEDAI distribution across the cohort. 
 
 ```{r}
 # get DA information from the sample-data relationship file
@@ -313,7 +332,8 @@ plasma.df %>%
                                y = LV52)) +
   ggplot2::geom_boxplot(notch = TRUE) +
   ggplot2::theme_bw() +
-  ggplot2::labs(x = "Disease Activity")
+  ggplot2::labs(x = "Disease Activity") +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
 ```
 
 ```{r}
@@ -335,7 +355,8 @@ plasma.df %>%
                                y = LV136)) +
   ggplot2::geom_boxplot(notch = TRUE) +
   ggplot2::theme_bw() +
-  ggplot2::labs(x = "Disease Activity")
+  ggplot2::labs(x = "Disease Activity") +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
 ```
 
 ```{r}
