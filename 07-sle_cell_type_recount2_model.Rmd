@@ -317,7 +317,9 @@ ggplot2::ggplot(neutro.df, ggplot2::aes(x = recount2_LV603,
     ggplot2::theme_bw() +
     ggplot2::labs(x = "recount2 LV603", y = "SLE WB LV87") +
     ggplot2::theme(legend.position = "none", 
-                   text = ggplot2::element_text(size = 15))
+                   text = ggplot2::element_text(size = 15)) +
+    ggplot2::annotate(geom = "text", x = -0.375, y = 1,  
+                      label = "r-squared = 0.87") 
 ```
 
 ```{r}
@@ -355,13 +357,17 @@ colnames(rsq.df) <- "r.squared"
 ```{r}
 ggplot2::ggplot(rsq.df, ggplot2::aes(x = r.squared)) +
   ggplot2::geom_density() +
-  ggplot2::geom_vline(xintercept = rsq.df[603, ], colour = "blue") +
+  ggplot2::geom_segment(mapping = ggplot2::aes(x = rsq.df[603, ], 
+                                               xend = rsq.df[603, ],
+                                               y = 14, yend = 0),
+                        arrow = grid::arrow(),
+                        colour = "blue") +
   ggplot2::theme_bw() +
   ggplot2::theme(text = ggplot2::element_text(size = 13)) +
   ggplot2::labs(x = "R-squared", subtitle = "Neutrophil Count ~ LV Value", 
                 title = "Distribution of R-squared values") +
-  ggplot2::annotate(geom = "text", x = 0.34, y = 15, colour = "blue", 
-                    label = "LV603", size = 5)
+  ggplot2::annotate(geom = "text", x = 0.36, y = 15, colour = "blue", 
+                    label = "LV603", size = 5) 
 ```
 
 ```{r}
