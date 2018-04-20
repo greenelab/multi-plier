@@ -94,7 +94,9 @@ dev.off()
 ```
 #### All LVs
 
-What proportion of entries in `U` are non-zero (column-wise)?
+What proportion of entries in `U` are non-zero (column-wise)? 
+`U` is the prior information coefficient matrix; it tells us how 
+the prior information in the form of pathways/gene sets relates to LVs.
 As a reminder, the fewer pathways that are associated with an LV (column), the
 easier interpretation will be. 
 (Sparsity of `U` is a constraint in PLIER.)
@@ -173,14 +175,23 @@ coverage was `0.419`.
 
 ### PCA of lower-dimensional (LV) space
 
-We'll perform PCA on the B matrix from the SLE WB PLIER model. 
+We'll perform PCA on the `B` matrix from the SLE WB PLIER model. 
 This is mainly for visualization purposes. 
+
+The `B` matrix contains the samples values for each LV (from the model under 
+consideration -- here, the SLE WB PLIER model), where rows are LVs and samples
+are columns.
 
 As noted when we prepped the data in [`greenelab/rheum-plier-data/sle-wb`](https://github.com/greenelab/rheum-plier-data/tree/4be547553f24fecac9e2f5c2b469a17f9df253f0/sle-wb), [there are still differences](https://github.com/greenelab/rheum-plier-data/blob/4be547553f24fecac9e2f5c2b469a17f9df253f0/sle-wb/plots/PCA/SLE_WB_all_microarray_QN_PC1-5_zto.before.png) between datasets in the final compendium.
 
 If the LVs that are not associated with any pathway (all `AUC < 0.75`) 
 in fact capture nuisance variables, we expect that dropping them from 
 the `B` matrix may reduce the dataset effect.
+
+The AUC (and p-values) are calculated by holding out 1/5th of genes in a pathway
+(in the prior information matrix `C`), running PLIER, and testing how well the 
+loadings in `Z` capture the held-out genes.
+For more information, check out the [PLIER preprint (Mao, et al. 2017.)](http://dx.doi.org/10.1101/116061).
 
 ```{r}
 # Which LVs have pathways with AUC > 0.75?
