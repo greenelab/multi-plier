@@ -29,5 +29,8 @@ Rplots.pdf
 data/recount2_PLIER_data
 
 # other data from greenelab/rheum-plier-data
-data/expression_data
+data/expression_data/E-MTAB-2452_hugene11st_SCANfast.pcl
+data/expression_data/GSE18885_series_matrix.txt
+data/expression_data/NARES_SCANfast_ComBat.pcl
+data/expression_data/SLE_WB_all_microarray_QN_zto_before.pcl
 data/sample_info

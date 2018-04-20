@@ -1,0 +1,457 @@
+---
+title: "Banchereau, et al. cell type analyses with recount2 model"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In `06-sle-wb_cell_type`, we examined how LVs from the SLE WB PLIER model 
+(`results/05/SLE-WB_PLIER_model.RDS`) compared to known patterns in the
+[Banchereau, et al.](https://doi.org/10.1016/j.cell.2016.03.008) data set that 
+was included in the SLE WB compendium (and therefore, training).
+
+Specifically, we asked:
+
+* Are there neutrophil-associated LVs that are correlated with neutrophil 
+  counts?
+* Are there plasma cell-associated LVs that demonstrate differential expression
+  between disease activity groups (specifically, higher values in more severe 
+  disease)?
+  
+The answer to both of these questions is yes. 
+This demonstrated the utility of PLIER for extracting cell type patterns from 
+heterogeneous (at least in terms of patient population and platform) gene 
+expression data from a single tissue (whole blood) that had been assembled into 
+a compendium ([`greenelab/rheum-plier-data/sle-wb`](https://github.com/greenelab/rheum-plier-data/tree/4be547553f24fecac9e2f5c2b469a17f9df253f0/sle-wb)).
+
+SLE is not a rare condition -- though the molecular heterogeneity and 
+multi-tissue nature of the disease warrant sophisticated approaches to the 
+analysis of transcriptomic data.
+(This SLE WB compendium is comprised of 1640 samples and is _incomplete_; we 
+picked 7 data sets based on the platform used and the availability of raw data.) 
+Thus, we can use data-intensive approaches (e.g., PLIER) that are inappropriate 
+for smaller data sets and, by extension, rare or understudied diseases.
+
+Using a "shovel-ready" data set like [recount2](https://jhubiostatistics.shinyapps.io/recount/) 
+to train a PLIER model (see [`greenelab/rheum-plier-data/recount2`](https://github.com/greenelab/rheum-plier-data/tree/4be547553f24fecac9e2f5c2b469a17f9df253f0/recount2))
+and applying this model to smaller data sets may "get around" the data-intensive
+requirement, but more investigation is warranted.
+
+In this notebook, we examine whether we can use the recount2 PLIER model 
+(`data/recount2_PLIER_data/recount_PLIER_model.RDS`) to analyze neutrophil and 
+plasma cell patterns in the Banchereau, et al. data.
+If the recount2 model performance is similar to that of the SLE model
+(examined in `06-sle-wb_cell_type`), that is evidence supporting the validity 
+of this transfer learning approach.
+
+## Functions and directory set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+library(PLIER)
+
+# custom functions
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "07")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "07")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Load data
+
+### recount2 model
+
+```{r}
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+### SLE WB expression data
+
+```{r}
+symbol.file <- 
+  file.path("data", "expression_data", 
+            "SLE_WB_all_microarray_QN_zto_before_with_GeneSymbol.pcl")
+sle.exprs.df <- readr::read_tsv(symbol.file, progress = FALSE)
+# matrix with gene symbol as rownames
+exprs.mat <- dplyr::select(sle.exprs.df, -EntrezID)
+rownames(exprs.mat) <- exprs.mat$GeneSymbol
+exprs.mat <- as.matrix(dplyr::select(exprs.mat, -GeneSymbol))
+```
+
+### SLE WB cell type LV dfs
+
+From `06-sle-wb_cell_type`
+
+```{r}
+neutro.file <- file.path("results", "06",
+                         "Banchereau_count_SLE_model_neutrophil_LV.tsv")
+sle.neutro.df <- readr::read_tsv(neutro.file)
+plasma.file <- file.path("results", "06", 
+                         "Banchereau_DA_group_SLE_model_plasma_cell_LVs.tsv")
+sle.plasma.df <- readr::read_tsv(plasma.file)
+```
+
+## Cell type-associated LVs in the recount2 model
+
+```{r}
+# summary information from the recount2 PLIER model
+recount.summary <- recount.plier$summary
+```
+
+### Neutrophil
+
+Are there recount2 LVs associated with neutrophil gene sets?
+
+```{r}
+recount.summary %>%
+  dplyr::filter(grepl("Neutrophil", pathway), 
+                FDR < 0.05)
+```
+
+The following latent variables look most promising: `LV524`, `LV603`, `LV985`
+(`AUC > 0.75` for both `SVM Neutrophils` and `IRIS_Neutrophil-Resting`)
+
+What other gene sets are associated with these LVs?
+
+```{r}
+recount.summary %>%
+  dplyr::filter(`LV index` %in% c(524, 603, 985),
+                FDR < 0.05) %>%
+  dplyr::arrange(`LV index`, desc(AUC))
+```
+
+Some notes on these results:
+
+* `LV524` is also associated with the following monocyte-related gene sets: 
+`SVM Monocytes`, `DMAP_MONO1`, and `DMAP_MONO2`. Again, we would like something
+that tells us about neutrophils _only_ if at all possible.
+* `LV603` is associated with two other gene sets, [`PID_IL8CXCR2_PATHWAY`](http://software.broadinstitute.org/gsea/msigdb/cards/PID_IL8_CXCR2_PATHWAY.html) and
+[`SIG_PIP3_SIGNALING_IN_B_LYMPHOCYTES`](http://software.broadinstitute.org/gsea/msigdb/cards/SIG_PIP3_SIGNALING_IN_B_LYMPHOCYTES.html).
+It's worth noting that interleukin 8 (`IL8`) is a neutrophil chemoattractant, 
+and `SIG_PIP3_SIGNALING_IN_B_LYMPHOCYTES` [may just be related](http://software.broadinstitute.org/gsea/msigdb/compute_overlaps.jsp?geneSetName=SIG_PIP3_SIGNALING_IN_B_LYMPHOCYTES&collection=C2) to PI3K signaling & chemotaxis in general.
+* `LV985` is also associated with `SIG_PIP3_SIGNALING_IN_B_LYMPHOCYTES` and
+[`PID_FCER1PATHWAY`](http://software.broadinstitute.org/gsea/msigdb/cards/PID_FCER1_PATHWAY.html).
+`FCER1` refers to Fc-epsilon receptor 1 which is mainly expressed on other
+granulocytes.
+
+
+#### U matrix
+
+```{r}
+PLIER::plotU(plierRes = recount.plier,
+             pval.cutoff = 1e-06,
+             indexCol = c(524, 603, 985),
+             top = 10)
+```
+
+```{r}
+png(file.path(plot.dir, "recount2_neutrophil_Uplot.png"), 
+    res = 300, width = 7, height = 7, units = "in")
+PLIER::plotU(plierRes = recount.plier,
+             pval.cutoff = 1e-06,
+             indexCol = c(524, 603, 985),
+             top = 10)
+dev.off()
+```
+
+### Plasma cell
+
+Are there LVs associated with plasma cell gene sets in the recount2 model?
+
+```{r}
+recount.summary %>%
+  dplyr::filter(grepl("Plasma", pathway), 
+                FDR < 0.05)
+```
+
+What other gene sets are associated with `LV951`?
+
+```{r}
+recount.summary %>%
+  dplyr::filter(`LV index` == 951)
+```
+
+`KEGG_INTESTINAL_IMMUNE_NETWORK_FOR_IGA_PRODUCTION` is not a significant 
+association (`FDR = 0.13`)
+There were 2 LVs from the SLE WB PLIER model that were associated with plasma
+cell gene sets. 
+Those LVs were also associated with other processes (e.g., 
+`REACTOME_UNFOLDED_PROTEIN_RESPONSE`, `KEGG_HEDGEHOG_SIGNALING_PATHWAY`)
+
+## Transform SLE WB data
+
+```{r}
+sle.recount.b <- GetNewDataB(exprs.mat = exprs.mat,
+                             plier.model = recount.plier)
+```
+
+## Banchereau, et al. cell type results
+
+### Neutrophil
+
+```{r}
+neutro.lv.df <- as.data.frame(cbind(colnames(sle.recount.b), 
+                                    t(sle.recount.b[c(524, 603, 985), ])))
+colnames(neutro.lv.df) <- c("Sample", "recount2_LV524", "recount2_LV603", 
+                            "recount2_LV985")
+```
+
+```{r}
+# join with sle wb results & neutrophil counts
+neutro.df <- dplyr::inner_join(sle.neutro.df, neutro.lv.df) %>%
+              dplyr::mutate(recount2_LV524 = as.numeric(as.character(recount2_LV524)), 
+                            recount2_LV603 = as.numeric(as.character(recount2_LV603)),
+                            recount2_LV985 = as.numeric(as.character(recount2_LV985)))
+head(neutro.df)
+```
+
+```{r}
+# function for scatter plots, given lv (a string indicating the LV of interest)
+# make a scatter plot where the LV is the x variable, neutrophil count is the
+# y variable & fit a line with geom_smooth(method = "lm")
+# also will annotate the plot with the supplied r-squared value (rsq arg)
+# where the text is placed is automatically chosen from the x and y values
+# needs to be used in this global environment
+LVScatter <- function(lv, rsq) {
+  y.var <- "Neutrophil.Count"
+  
+  # calculate where to put the r-squared value
+  x.range <- max(neutro.df[, lv]) - min(neutro.df[, lv])
+  x.coord <- min(neutro.df[, lv]) + (x.range * 0.15)
+  y.range <- max(neutro.df[, y.var]) - min(neutro.df[, y.var])
+  y.coord <- max(neutro.df[, y.var]) - (y.range * 0.15)
+  
+  ggplot2::ggplot(neutro.df, ggplot2::aes_string(x = lv, y = y.var)) +
+    ggplot2::geom_point(alpha = 0.7) +
+    ggplot2::geom_smooth(method = "lm") +
+    ggplot2::theme_bw() +
+    ggplot2::labs(y = "Neutrophil Count") +
+    ggplot2::theme(legend.position = "none", 
+                   text = ggplot2::element_text(size = 15)) +
+    ggplot2::annotate("text", x = x.coord, y = y.coord, 
+                      label = paste("r-squared =", rsq))
+}
+```
+
+#### LV524
+
+```{r}
+summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$recount2_LV524))
+```
+
+```{r}
+LVScatter(lv = "recount2_LV524", rsq = 0.34)
+```
+
+
+#### LV603
+
+```{r}
+summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$recount2_LV603))
+```
+
+```{r}
+LVScatter(lv = "recount2_LV603", rsq = 0.36)
+```
+
+#### LV985
+
+
+```{r}
+summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$recount2_LV985))
+```
+
+```{r}
+LVScatter(lv = "recount2_LV985", rsq = 0.32)
+```
+
+The neutrophil-associated LVs from the recount2 model generally perform as well
+as the neutrophil-associated LVs from the SLE WB PLIER model.
+
+We'll plot the results from `SLE WB LV87` and `recount2 LV603` together because
+these are both LVs that are not significantly associated with monocyte 
+signatures and have high AUC for the neutrophil gene sets.
+
+
+```{r}
+sle.plot <- LVScatter("LV87", rsq = 0.29) +
+  ggplot2::labs(title = "SLE WB PLIER model") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"))
+```
+
+```{r}
+recount.plot <- LVScatter("recount2_LV603", rsq = 0.36) +
+  ggplot2::labs(title = "recount2 PLIER model") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"))
+```
+
+```{r}
+pdf(file.path(plot.dir, "Neutrophil_LV_model_comparison.pdf"), width = 14,
+    height = 7)
+gridExtra::grid.arrange(sle.plot, recount.plot, ncol = 2)
+dev.off()
+```
+
+#### Correlation between LV values from different models
+
+```{r}
+summary(lm(neutro.df$LV87 ~ neutro.df$recount2_LV603))
+```
+
+```{r}
+ggplot2::ggplot(neutro.df, ggplot2::aes(x = recount2_LV603, 
+                                        y = LV87)) +
+    ggplot2::geom_point(alpha = 0.7) +
+    ggplot2::geom_smooth(method = "lm") +
+    ggplot2::theme_bw() +
+    ggplot2::labs(x = "recount2 LV603", y = "SLE WB LV87") +
+    ggplot2::theme(legend.position = "none", 
+                   text = ggplot2::element_text(size = 15)) +
+    ggplot2::annotate(geom = "text", x = -0.375, y = 1,  
+                      label = "r-squared = 0.87") 
+```
+
+```{r}
+plot.file <- 
+  file.path(plot.dir, "Banchereau_neutrophil_count_LV87_v_recLV603_scatter.png")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+
+#### Distribution of correlation values
+
+There are 987 latent variables from the recount2 PLIER model. 
+Could any one of them be well-correlated with the Banchereau, et al. 
+neutrophil counts by chance?
+
+```{r}
+recount.b.t <- as.data.frame(t(sle.recount.b))
+recount.b.t <- tibble::rownames_to_column(recount.b.t, "Sample")
+head(recount.b.t)
+```
+
+```{r}
+b.count.df <- dplyr::inner_join(x = neutro.df[, c("Sample", 
+                                                  "Neutrophil.Count")],
+                                y = recount.b.t, by = "Sample")
+```
+
+```{r}
+rsq.all.lv <- (cor(x = b.count.df$Neutrophil.Count, 
+                   y = b.count.df[, 3:ncol(b.count.df)])) ^ 2
+rsq.df <- as.data.frame(matrix(rsq.all.lv, ncol = 1))
+colnames(rsq.df) <- "r.squared"
+```
+
+```{r}
+ggplot2::ggplot(rsq.df, ggplot2::aes(x = r.squared)) +
+  ggplot2::geom_density() +
+  ggplot2::geom_segment(mapping = ggplot2::aes(x = rsq.df[603, ], 
+                                               xend = rsq.df[603, ],
+                                               y = 14, yend = 0),
+                        arrow = grid::arrow(),
+                        colour = "blue") +
+  ggplot2::theme_bw() +
+  ggplot2::theme(text = ggplot2::element_text(size = 13)) +
+  ggplot2::labs(x = "R-squared", subtitle = "Neutrophil Count ~ LV Value", 
+                title = "Distribution of R-squared values") +
+  ggplot2::annotate(geom = "text", x = 0.36, y = 15, colour = "blue", 
+                    label = "LV603", size = 5) 
+```
+
+```{r}
+plot.file <- 
+  file.path(plot.dir, "Banchereau_neutrophil_count_recount2_lv_rsq.png")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+```{r}
+which.max(rsq.all.lv)
+```
+
+`recount2 LV603` has the highest R-squared with the Banchereau, et al. 
+neutrophil counts.
+
+### Plasma cell
+
+```{r}
+# get LV951 into data.frame form
+plasma.lv.df <- as.data.frame(cbind(colnames(sle.recount.b), 
+                                    sle.recount.b[951, ]))
+colnames(plasma.lv.df) <- c("Sample", "recount2_LV951")
+```
+
+```{r}
+# join with SLE WB results
+plasma.df <- dplyr::inner_join(sle.plasma.df, plasma.lv.df, by = "Sample") %>%
+  dplyr::mutate(recount2_LV951 = as.numeric(as.character(recount2_LV951)))
+head(plasma.df)
+```
+
+```{r}
+plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = recount2_LV951)) +
+  ggplot2::geom_boxplot(notch = TRUE) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity") +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
+```
+
+```{r}
+# check for statistical significance 
+# (pairwise t-test is consistent with original publication as far as I can tell)
+pairwise.t.test(x = plasma.df$recount2_LV951, 
+                g = plasma.df$Disease.Activity, 
+                p.adjust.method = "bonferroni")
+```
+
+This is highly similar to what we saw in `06-sle-wb_cell_type`.
+
+Now we'll plot the recount2 (`recount2_LV951`) and SLE WB model (`LV52`) 
+results side by side as we did above with the neutrophil scatterplots.
+
+```{r}
+sle.plot <- plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = LV52)) +
+  ggplot2::geom_boxplot(notch = TRUE) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity",
+                title = "SLE WB PLIER model") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold")) +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
+```
+
+```{r}
+recount.plot <- plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = recount2_LV951)) +
+  ggplot2::geom_boxplot(notch = TRUE) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity",
+                title = "recount2 PLIER model") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold")) +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
+```
+
+```{r}
+pdf(file.path(plot.dir, "Plasma_cell_LV_model_comparison.pdf"), width = 14,
+    height = 7)
+gridExtra::grid.arrange(sle.plot, recount.plot, ncol = 2)
+dev.off()
+```
+

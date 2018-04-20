@@ -1,0 +1,342 @@
+---
+title: "Systemic lupus erythematosus whole blood compendium PLIER training"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In this notebook, we'll train a PLIER model on the systemic lupus erythematosis 
+(SLE) whole blood (WB) compendium we processed in 
+[`greenelab/rheum-plier-data/sle-wb`](https://github.com/greenelab/rheum-plier-data/tree/4be547553f24fecac9e2f5c2b469a17f9df253f0/sle-wb)
+and do some exploratory data analysis.
+
+## Functions and directory set up
+
+```{r}
+library(AnnotationDbi)
+
+`%>%` <- dplyr::`%>%`
+# custom functions
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "05")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "05")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Load SLE WB data
+```{r}
+exprs.file <- file.path("data", "expression_data", 
+                        "SLE_WB_all_microarray_QN_zto_before.pcl")
+exprs.df <- readr::read_tsv(exprs.file)
+```
+### Annotation
+```{r}
+symbol.obj <- org.Hs.eg.db::org.Hs.egSYMBOL
+mapped.genes <- AnnotationDbi::mappedkeys(symbol.obj)
+symbol.list <- as.list(symbol.obj[mapped.genes])
+symbol.df <- as.data.frame(cbind(names(symbol.list), unlist(symbol.list)))
+colnames(symbol.df) <- c("EntrezID", "GeneSymbol")
+
+# get gene column name to match to facilitate use with dplyr
+colnames(exprs.df)[1] <- "EntrezID"
+
+# matching types
+symbol.df$EntrezID <- as.integer(as.character(symbol.df$EntrezID))
+
+# inner join
+annot.exprs.df <- dplyr::inner_join(symbol.df, exprs.df, by = "EntrezID")
+
+symbol.file <- 
+  file.path("data", "expression_data", 
+            "SLE_WB_all_microarray_QN_zto_before_with_GeneSymbol.pcl")
+
+readr::write_delim(annot.exprs.df, path = symbol.file, delim = "\t")
+
+# matrix with gene symbol as rownames
+exprs.mat <- dplyr::select(annot.exprs.df, -EntrezID)
+rownames(exprs.mat) <- exprs.mat$GeneSymbol
+exprs.mat <- as.matrix(dplyr::select(exprs.mat, -GeneSymbol))
+```
+```{r}
+exprs.mat[1:5, 1:5]
+```
+
+## PLIER model training
+
+```{r}
+plier.result <- PLIERNewData(exprs.mat = exprs.mat)
+```
+```{r}
+model.file <- file.path(results.dir, "SLE-WB_PLIER_model.RDS")
+saveRDS(plier.result, file = model.file)
+```
+
+## Explore SLE WB PLIER model
+
+### U matrix
+
+We can get an overview of what pathways are captured with the LVs by plotting 
+`U` with `PLIER::plotU`.
+`U` is the prior information coefficient matrix; it tells us how 
+the prior information in the form of pathways/gene sets relates to LVs.
+
+```{r}
+pdf(file.path(plot.dir, "SLE-WB_PLIER_Uplot_auc0.75.pdf"))
+PLIER::plotU(plier.result, auc.cutoff = 0.75, fontsize_row = 4,
+             fontsize_col = 7)
+dev.off()
+```
+#### All LVs
+
+What proportion of entries in `U` are non-zero (column-wise)? 
+As a reminder, the fewer pathways that are associated with an LV (column), the
+easier interpretation will be. 
+(Sparsity of `U` is a constraint in PLIER.)
+
+```{r}
+num.lvs <- ncol(plier.result$Z)
+u.sparsity.all <- CalculateUSparsity(plier.results = plier.result,
+                                     significant.only = FALSE)
+
+ggplot2::ggplot(as.data.frame(u.sparsity.all),
+                ggplot2::aes(x = u.sparsity.all)) +
+  ggplot2::geom_density(fill = "blue", alpha = 0.5) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "proportion of positive entries in U",
+                title = paste("All LVs, n =", num.lvs))
+```
+
+```{r}
+plot.file <- file.path(plot.dir,
+                       "SLE-WB_model_U_sparsity_all_density.png")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot(),
+                height = 5, width = 7)
+```
+```{r}
+summary(u.sparsity.all)
+```
+
+#### Pathway-associated LVs
+
+Now, only with _significant_ associations (`FDR < 0.05`).
+
+```{r}
+plier.summary <- plier.result$summary
+sig.summary <- plier.summary %>%
+  dplyr::filter(FDR < 0.05)
+num.sig.lvs <- length(unique(sig.summary$`LV index`))
+```
+
+```{r}
+u.sparsity.sig <- CalculateUSparsity(plier.results = plier.result,
+                                     significant.only = TRUE,
+                                     fdr.cutoff = 0.05)
+
+ggplot2::ggplot(as.data.frame(u.sparsity.sig),
+                ggplot2::aes(x = u.sparsity.sig)) +
+  ggplot2::geom_density(fill = "blue", alpha = 0.5) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "proportion of positive entries in U",
+                title = paste("Pathway-associated LVs, n =", num.sig.lvs))
+```
+```{r}
+plot.file <- file.path(plot.dir,
+                       "SLE-WB_model_U_sparsity_sig_density.png")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot(),
+                height = 5, width = 7)
+```
+
+```{r}
+summary(u.sparsity.sig)
+```
+
+### Pathway coverage
+
+What proportion of the pathways input into the model are significantly 
+associated (`FDR < 0.05`) with an LV? 
+
+```{r}
+sle.coverage <- GetPathwayCoverage(plier.results = plier.result)
+
+# Pathway coverage
+sle.coverage$pathway
+```
+
+Less pathways are "covered" with this model than the recount2 model, where 
+coverage was `0.419`.
+
+### PCA of lower-dimensional (LV) space
+
+We'll perform PCA on the `B` matrix from the SLE WB PLIER model. 
+This is mainly for visualization purposes. 
+
+The `B` matrix contains the samples values for each LV (from the model under 
+consideration -- here, the SLE WB PLIER model), where rows are LVs and samples
+are columns.
+
+As noted when we prepped the data in [`greenelab/rheum-plier-data/sle-wb`](https://github.com/greenelab/rheum-plier-data/tree/4be547553f24fecac9e2f5c2b469a17f9df253f0/sle-wb), [there are still differences](https://github.com/greenelab/rheum-plier-data/blob/4be547553f24fecac9e2f5c2b469a17f9df253f0/sle-wb/plots/PCA/SLE_WB_all_microarray_QN_PC1-5_zto.before.png) between datasets in the final compendium.
+
+If the LVs that are not associated with any pathway (all `AUC < 0.75`) 
+in fact capture nuisance variables, we expect that dropping them from 
+the `B` matrix may reduce the dataset effect.
+
+The AUC (and p-values) are calculated by holding out 1/5th of genes in a pathway
+(in the prior information matrix `C`), running PLIER, and testing how well the 
+loadings in `Z` capture the held-out genes.
+For more information, check out the [PLIER preprint (Mao, et al. 2017.)](http://dx.doi.org/10.1101/116061).
+
+```{r}
+# Which LVs have pathways with AUC > 0.75?
+lv.auc <- 
+  as.integer(unique(plier.summary$`LV index`[which(plier.summary$AUC > 0.75)]))
+
+# B matrix
+b.matrix <- as.matrix(plier.result$B)
+
+# B matrix -- only LV AUC > 0.75 (any pathway)
+sig.b.mat <- b.matrix[lv.auc, ]
+
+# B matrix all other LV 
+oth.b.mat <- b.matrix[-lv.auc, ]
+```
+
+```{r}
+# color palette for PCA plots
+plot.color.pal <- c("#54FF9F", "#43CD80", "#2E8B57", "#006400", "#FF8C00",
+                    "#8B4500", "#000080")
+# read sample dataset mapping file
+sd.file <- file.path("data", "sample_info", "sle-wb_sample_dataset_mapping.tsv")
+sd.df <- readr::read_tsv(sd.file)
+```
+
+#### All latent variables
+```{r}
+# PCA
+all.lv.pc <- prcomp(t(b.matrix))
+cum.var.exp <- cumsum(all.lv.pc$sdev^2 / sum(all.lv.pc$sdev^2))
+
+# PC1-2 in form suitable for ggplot2
+all.lv.df <- as.data.frame(cbind(rownames(all.lv.pc$x),
+                                 all.lv.pc$x[, 1:2]))
+colnames(all.lv.df)[1] <- "SampleID"
+# add dataset of origin info
+all.lv.df <- dplyr::full_join(all.lv.df, sd.df, by = "SampleID") %>%
+  dplyr::mutate(PC1 = as.numeric(as.character(PC1)),
+                PC2 = as.numeric(as.character(PC2)),
+                Dataset = factor(Dataset, 
+                                 levels = c("E-GEOD-39088",
+                                            "E-GEOD-61635",
+                                            "E-GEOD-72747",
+                                            "E-GEOD-11907",
+                                            "E-GEOD-49454",
+                                            "E-GEOD-65391",
+                                            "E-GEOD-78193")))
+
+# plotting
+all.plot <- 
+  ggplot2::ggplot(all.lv.df, ggplot2::aes(x = PC1, y = PC2, colour = Dataset)) +
+    ggplot2::geom_point(alpha = 0.5) +
+    ggplot2::scale_color_manual(values = plot.color.pal) +
+    ggplot2::theme_bw() +
+    ggplot2::labs(x = paste0("PC1 (cum var exp = ", 
+                             round(cum.var.exp[1], 3), ")"),
+                  y = paste0("PC2 (cum var exp = ", 
+                             round(cum.var.exp[2], 3), ")"), 
+                  title = "All Latent Variables") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                      face = "bold"))
+all.plot
+```
+
+#### Pathway-associated latent variables
+```{r}
+# PCA
+path.lv.pc <- prcomp(t(sig.b.mat))
+cum.var.exp <- cumsum(path.lv.pc$sdev^2 / sum(path.lv.pc$sdev^2))
+# PC1-2 in form suitable for ggplot2
+path.lv.df <- as.data.frame(cbind(rownames(path.lv.pc$x),
+                                 path.lv.pc$x[, 1:2]))
+colnames(path.lv.df)[1] <- "SampleID"
+# add dataset of origin info
+path.lv.df <- dplyr::full_join(path.lv.df, sd.df, by = "SampleID") %>%
+  dplyr::mutate(PC1 = as.numeric(as.character(PC1)),
+                PC2 = as.numeric(as.character(PC2)),
+                Dataset = factor(Dataset, 
+                                 levels = c("E-GEOD-39088",
+                                            "E-GEOD-61635",
+                                            "E-GEOD-72747",
+                                            "E-GEOD-11907",
+                                            "E-GEOD-49454",
+                                            "E-GEOD-65391",
+                                            "E-GEOD-78193")))
+
+# plotting
+path.plot <- 
+  ggplot2::ggplot(path.lv.df, ggplot2::aes(x = PC1, y = PC2, 
+                                           colour = Dataset)) +
+  ggplot2::geom_point(alpha = 0.5) +
+  ggplot2::scale_color_manual(values = plot.color.pal) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = paste0("PC1 (cum var exp = ", 
+                           round(cum.var.exp[1], 3), ")"),
+                y = paste0("PC2 (cum var exp = ", 
+                           round(cum.var.exp[2], 3), ")"),
+                title = "Pathway-associated Latent Variables (AUC > 0.75)") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"))
+path.plot
+```
+
+#### Other latent variables (AUC <= 0.75)
+```{r}
+# PCA
+oth.lv.pc <- prcomp(t(oth.b.mat))
+cum.var.exp <- cumsum(oth.lv.pc$sdev^2 / sum(oth.lv.pc$sdev^2))
+# PC1-2 in form suitable for ggplot2
+oth.lv.df <- as.data.frame(cbind(rownames(oth.lv.pc$x),
+                                 oth.lv.pc$x[, 1:2]))
+colnames(oth.lv.df)[1] <- "SampleID"
+# add dataset of origin info
+oth.lv.df <- dplyr::full_join(oth.lv.df, sd.df, by = "SampleID") %>%
+  dplyr::mutate(PC1 = as.numeric(as.character(PC1)),
+                PC2 = as.numeric(as.character(PC2)),
+                Dataset = factor(Dataset, 
+                                 levels = c("E-GEOD-39088",
+                                            "E-GEOD-61635",
+                                            "E-GEOD-72747",
+                                            "E-GEOD-11907",
+                                            "E-GEOD-49454",
+                                            "E-GEOD-65391",
+                                            "E-GEOD-78193")))
+
+# plotting
+oth.plot <- 
+  ggplot2::ggplot(oth.lv.df, ggplot2::aes(x = PC1, y = PC2, colour = Dataset)) +
+    ggplot2::geom_point(alpha = 0.5) +
+    ggplot2::scale_color_manual(values = plot.color.pal) +
+    ggplot2::theme_bw() +
+    ggplot2::labs(x = paste0("PC1 (cum var exp = ", 
+                           round(cum.var.exp[1], 3), ")"),
+                  y = paste0("PC2 (cum var exp = ", 
+                           round(cum.var.exp[2], 3), ")"),
+                  title = "Latent Variables AUC <= 0.75") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                      face = "bold"))
+oth.plot
+```
+
+```{r}
+# Save to PDF
+pdf(file.path(plot.dir, "SLE-WB_PLIER_LV_PCA_plots.pdf"), height = 14, 
+              width = 7)
+gridExtra::grid.arrange(all.plot, path.plot, oth.plot, ncol = 1)
+dev.off()
+```
