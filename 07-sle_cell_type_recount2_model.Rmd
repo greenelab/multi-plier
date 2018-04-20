@@ -124,10 +124,8 @@ What other gene sets are associated with these LVs?
 
 ```{r}
 recount.summary %>%
-  dplyr::filter(`LV index` == 524 |
-                  `LV index` == 603 |
-                  `LV index` == 985) %>%
-  dplyr::filter(FDR < 0.05) %>%
+  dplyr::filter(`LV index` %in% c(524, 603, 985),
+                FDR < 0.05) %>%
   dplyr::arrange(`LV index`, desc(AUC))
 ```
 
@@ -220,46 +218,60 @@ head(neutro.df)
 # function for scatter plots, given lv (a string indicating the LV of interest)
 # make a scatter plot where the LV is the x variable, neutrophil count is the
 # y variable & fit a line with geom_smooth(method = "lm")
+# also will annotate the plot with the supplied r-squared value (rsq arg)
+# where the text is placed is automatically chosen from the x and y values
 # needs to be used in this global environment
-LVScatter <- function(lv = "LV2") {
+LVScatter <- function(lv, rsq) {
   y.var <- "Neutrophil.Count"
+  
+  # calculate where to put the r-squared value
+  x.range <- max(neutro.df[, lv]) - min(neutro.df[, lv])
+  x.coord <- min(neutro.df[, lv]) + (x.range * 0.15)
+  y.range <- max(neutro.df[, y.var]) - min(neutro.df[, y.var])
+  y.coord <- max(neutro.df[, y.var]) - (y.range * 0.15)
+  
   ggplot2::ggplot(neutro.df, ggplot2::aes_string(x = lv, y = y.var)) +
-  ggplot2::geom_count() +
-  ggplot2::geom_smooth(method = "lm") +
-  ggplot2::theme_bw() +
-  ggplot2::labs(y = "Neutrophil Count") +
-  ggplot2::theme(legend.position = "none")
+    ggplot2::geom_point(alpha = 0.7) +
+    ggplot2::geom_smooth(method = "lm") +
+    ggplot2::theme_bw() +
+    ggplot2::labs(y = "Neutrophil Count") +
+    ggplot2::theme(legend.position = "none", 
+                   text = ggplot2::element_text(size = 15)) +
+    ggplot2::annotate("text", x = x.coord, y = y.coord, 
+                      label = paste("r-squared =", rsq))
 }
 ```
 
 #### LV524
 
 ```{r}
-LVScatter(lv = "recount2_LV524")
-```
-
-```{r}
 summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$recount2_LV524))
 ```
 
-#### LV603
-
 ```{r}
-LVScatter(lv = "recount2_LV603")
+LVScatter(lv = "recount2_LV524", rsq = 0.34)
 ```
+
+
+#### LV603
 
 ```{r}
 summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$recount2_LV603))
 ```
 
+```{r}
+LVScatter(lv = "recount2_LV603", rsq = 0.36)
+```
+
 #### LV985
 
-```{r}
-LVScatter(lv = "recount2_LV985")
-```
 
 ```{r}
 summary(lm(neutro.df$Neutrophil.Count ~ neutro.df$recount2_LV985))
+```
+
+```{r}
+LVScatter(lv = "recount2_LV985", rsq = 0.32)
 ```
 
 The neutrophil-associated LVs from the recount2 model generally perform as well
@@ -271,19 +283,17 @@ signatures and have high AUC for the neutrophil gene sets.
 
 
 ```{r}
-sle.plot <- LVScatter("LV87") +
+sle.plot <- LVScatter("LV87", rsq = 0.29) +
   ggplot2::labs(title = "SLE WB PLIER model") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
-                                                    face = "bold")) +
-  ggplot2::annotate("text", x = -1, y = 15, label = "r-squared = 0.29")
+                                                    face = "bold"))
 ```
 
 ```{r}
-recount.plot <- LVScatter("recount2_LV603") +
+recount.plot <- LVScatter("recount2_LV603", rsq = 0.36) +
   ggplot2::labs(title = "recount2 PLIER model") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
-                                                    face = "bold")) +
-  ggplot2::annotate("text", x = -0.375, y = 15, label = "r-squared = 0.36")
+                                                    face = "bold"))
 ```
 
 ```{r}
@@ -292,6 +302,80 @@ pdf(file.path(plot.dir, "Neutrophil_LV_model_comparison.pdf"), width = 14,
 gridExtra::grid.arrange(sle.plot, recount.plot, ncol = 2)
 dev.off()
 ```
+
+#### Correlation between LV values from different models
+
+```{r}
+summary(lm(neutro.df$LV87 ~ neutro.df$recount2_LV603))
+```
+
+```{r}
+ggplot2::ggplot(neutro.df, ggplot2::aes(x = recount2_LV603, 
+                                        y = LV87)) +
+    ggplot2::geom_point(alpha = 0.7) +
+    ggplot2::geom_smooth(method = "lm") +
+    ggplot2::theme_bw() +
+    ggplot2::labs(x = "recount2 LV603", y = "SLE WB LV87") +
+    ggplot2::theme(legend.position = "none", 
+                   text = ggplot2::element_text(size = 15))
+```
+
+```{r}
+plot.file <- 
+  file.path(plot.dir, "Banchereau_neutrophil_count_LV87_v_recLV603_scatter.png")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+
+#### Distribution of correlation values
+
+There are 987 latent variables from the recount2 PLIER model. 
+Could any one of them be well-correlated with the Banchereau, et al. 
+neutrophil counts by chance?
+
+```{r}
+recount.b.t <- as.data.frame(t(sle.recount.b))
+recount.b.t <- tibble::rownames_to_column(recount.b.t, "Sample")
+head(recount.b.t)
+```
+
+```{r}
+b.count.df <- dplyr::inner_join(x = neutro.df[, c("Sample", 
+                                                  "Neutrophil.Count")],
+                                y = recount.b.t, by = "Sample")
+```
+
+```{r}
+rsq.all.lv <- (cor(x = b.count.df$Neutrophil.Count, 
+                   y = b.count.df[, 3:ncol(b.count.df)])) ^ 2
+rsq.df <- as.data.frame(matrix(rsq.all.lv, ncol = 1))
+colnames(rsq.df) <- "r.squared"
+```
+
+```{r}
+ggplot2::ggplot(rsq.df, ggplot2::aes(x = r.squared)) +
+  ggplot2::geom_density() +
+  ggplot2::geom_vline(xintercept = rsq.df[603, ], colour = "blue") +
+  ggplot2::theme_bw() +
+  ggplot2::theme(text = ggplot2::element_text(size = 13)) +
+  ggplot2::labs(x = "R-squared", subtitle = "Neutrophil Count ~ LV Value", 
+                title = "Distribution of R-squared values") +
+  ggplot2::annotate(geom = "text", x = 0.34, y = 15, colour = "blue", 
+                    label = "LV603", size = 5)
+```
+
+```{r}
+plot.file <- 
+  file.path(plot.dir, "Banchereau_neutrophil_count_recount2_lv_rsq.png")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+```{r}
+which.max(rsq.all.lv)
+```
+
+`recount2 LV603` has the highest R-squared with the Banchereau, et al. 
+neutrophil counts.
 
 ### Plasma cell
 
@@ -315,7 +399,8 @@ plasma.df %>%
                                y = recount2_LV951)) +
   ggplot2::geom_boxplot(notch = TRUE) +
   ggplot2::theme_bw() +
-  ggplot2::labs(x = "Disease Activity")
+  ggplot2::labs(x = "Disease Activity") +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
 ```
 
 ```{r}
@@ -340,7 +425,8 @@ sle.plot <- plasma.df %>%
   ggplot2::labs(x = "Disease Activity",
                 title = "SLE WB PLIER model") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
-                                                    face = "bold"))
+                                                    face = "bold")) +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
 ```
 
 ```{r}
@@ -352,7 +438,8 @@ recount.plot <- plasma.df %>%
   ggplot2::labs(x = "Disease Activity",
                 title = "recount2 PLIER model") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
-                                                    face = "bold"))
+                                                    face = "bold")) +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
 ```
 
 ```{r}
