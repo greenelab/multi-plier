@@ -85,6 +85,8 @@ saveRDS(plier.result, file = model.file)
 
 We can get an overview of what pathways are captured with the LVs by plotting 
 `U` with `PLIER::plotU`.
+`U` is the prior information coefficient matrix; it tells us how 
+the prior information in the form of pathways/gene sets relates to LVs.
 
 ```{r}
 pdf(file.path(plot.dir, "SLE-WB_PLIER_Uplot_auc0.75.pdf"))
@@ -95,8 +97,6 @@ dev.off()
 #### All LVs
 
 What proportion of entries in `U` are non-zero (column-wise)? 
-`U` is the prior information coefficient matrix; it tells us how 
-the prior information in the form of pathways/gene sets relates to LVs.
 As a reminder, the fewer pathways that are associated with an LV (column), the
 easier interpretation will be. 
 (Sparsity of `U` is a constraint in PLIER.)
