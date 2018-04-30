@@ -192,6 +192,8 @@ Those LVs were also associated with other processes (e.g.,
 ```{r}
 sle.recount.b <- GetNewDataB(exprs.mat = exprs.mat,
                              plier.model = recount.plier)
+b.file <- file.path(results.dir, "SLE-WB_B_matrix_recount2_model.RDS")
+saveRDS(sle.recount.b, file = b.file)
 ```
 
 ## Banchereau, et al. cell type results
