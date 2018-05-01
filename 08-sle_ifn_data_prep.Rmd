@@ -670,7 +670,7 @@ sle.b.meta.df <- dplyr::right_join(sle.b.df, array.att, by = "Sample") %>%
   dplyr::filter(LV %in% c("LV6", "LV38", "LV41"))
 
 # write to file
-sle.b.file <- file.path("results", "E-GEOD-78193_SLE-WB_PLIER_IFN_B.tsv")
+sle.b.file <- file.path(results.dir, "E-GEOD-78193_SLE-WB_PLIER_IFN_B.tsv")
 readr::write_tsv(sle.b.meta.df, path = sle.b.file)
 ```
 
@@ -686,7 +686,7 @@ rec.b.meta.df <- dplyr::right_join(recount.b.df, array.att, by = "Sample") %>%
   dplyr::filter(LV %in% c("LV35", "LV1070"))
 
 # write to file
-rec.b.file <- file.path("results", "E-GEOD-78193_recount2_PLIER_IFN_B.tsv")
+rec.b.file <- file.path(results.dir, "E-GEOD-78193_recount2_PLIER_IFN_B.tsv")
 readr::write_tsv(rec.b.meta.df, path = rec.b.file)
 ```
 
