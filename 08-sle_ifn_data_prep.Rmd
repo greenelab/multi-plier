@@ -1,0 +1,692 @@
+---
+title: "SLE IFN clinical trials - data preparation"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+The SLE WB compendium contains two data sets that examine interferon (IFN) 
+modulating treatments. 
+For context, IFNs are signaling molecules that modulate the immune response and 
+there are multiple types:
+
+* Type I - IFN-alpha, IFN-beta
+* Type II - IFN-gamma
+* Type III which are less well-characterized than I & II
+
+We're concerned with types I and II because these are the types we expect to be 
+modulated by the treatments included in the data we're working with (see more 
+information below).
+It's also worth noting that it can be difficult to distinguish between the two 
+when it comes to gene expression data, i.e., asking which interferon is inducing
+changes in gene expression can be tricky.
+
+Our compendium includes [a trial of IFN-alpha-kinoid (IFN-K)](https://doi.org/10.1002/art.37785), 
+which should block type I IFN only and therefore the expression levels of 
+IFN-alpha/IFN-beta gene signatures should decrease during treatment (leaving 
+IFN-gamma signature expression relatively unchanged). 
+[A trial of AMG-811](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5054935/), 
+which is a monoclonal antibody against IFN-gamma, is also included. We expected 
+to see IFN-gamma gene expression decrease in the AMG-811 during treatment.
+
+In this notebook, we'll tidy data in preparation for analyzing changes in 
+IFN-related gene expression using a couple different gene sets or models --
+modular transcriptional analyses (from 
+[Chiche, et al. 2014.](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4157826/)), 
+a PLIER model trained on the SLE WB compendium and a PLIER model trained on 
+recount2 data.
+
+## Functions and directory set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+#### Functions specifically for modular analyses
+```{r}
+ReadInTribeConversions <- function(filename) {
+  # Reads in csv file downloaded from Tribe and returns character vector. 
+  # The gene identifiers start at the 7th line. 
+  #
+  # Args:
+  #   filename: full path to csv file containing the list of gene identifers
+  #
+  # Returns:
+  #   geneset: a vector (character) of gene identifiers
+  #
+  
+  geneset <- readLines(filename)
+  geneset <- geneset[7:length(geneset)]
+  geneset <- gsub("\t", "", geneset)
+  return(geneset)
+
+}
+
+GetGeneSetMean <- function(gene.set, exprs) {
+  # Summarize the expression levels of genes in a gene set by taking the mean
+  # expression value of all genes in that gene set
+  #
+  # Args:
+  #   gene.set: vector of gene identifiers -- corresponds to the geneset to be
+  #             summarized
+  #   exprs: data.frame that contains the expression values (rows are genes,
+  #          columns are samples); first column -- "Gene" -- contains gene ids
+  #          (match the type of identifiers used in gene.set)
+  #
+  # Returns:
+  #   summary.df: a data.frame, 1 row corresponding to the mean expression 
+  #               values for genes in gene.set, columns are samples
+  #
+  
+  if (colnames(exprs)[1] != "Gene") {
+    stop("The first column must contain gene identifiers and have
+         the colname 'Gene'")
+  }
+  
+  `%>%` <- dplyr::`%>%`
+  
+  # get the genes in the gene set 
+  gene.set.exprs <- 
+    exprs[which(exprs$Gene %in% gene.set), 2:ncol(exprs)]
+  summary.df <- gene.set.exprs %>%
+    dplyr::summarise_all(mean)
+  return(summary.df)
+  
+}
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "08")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "08")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+```{r}
+# set seed for reproducibility (plot jitter)
+set.seed(123)
+```
+
+
+## IFN-K
+**E-GEOD-39088; Lauwerys, et al. 2013.**
+
+First, I'll summarize some relevant points from Lauwerys, et al.:
+
+* IFN-K is a therapeutic vaccine. 
+It induces IFN-alpha antibodies in those who receive it.
+In turn, those antibodies will bind IFN-alpha and therefore reduce its 
+activity/ability to stimulate the immune system.
+* Patients with SLE were treated with one of four doses of IFN-K or placebo.
+* Whole blood was collected from patients at days 0 (baseline), 112, and 168.
+* Healthy control blood was also included (2 samples from each control); 
+one of these healthy control blood samples was treated with type I IFNs 
+(IFN-alpha subtype(s) specifically) to derive an IFN-inducible gene expression 
+signature.
+* The authors stratified patients into _IFN-positive_ (n = 18) and 
+_IFN-negative_ (n = 9) groups based on the expression levels of the 
+IFN-inducible gene signature at baseline.
+* Patients with a IFN-positive baseline signature had a reduction in 
+IFN-inducible treatment during treatment. 
+
+We do not have information about which patients are in which of these two 
+groups, so we'll have to designate IFN-positive and IFN-negative samples based 
+on our own results.
+
+### Modular transcriptional analyses
+
+Module gene set information was obtained from 
+[the associated public wiki](https://www.biir.net/public_wikis/module_annotation/V2_Trial_8_Modules) 
+and converted to Entrez IDs with [Tribe](http://tribe.greenelab.com/). 
+The resulting gene sets are in `data/module_genesets`.
+
+In Chiche, et al., it was demonstrated that `M1.2`, `M3.4`, and `M5.12` are all 
+associated with IFN.
+More specifically, `M1.2` captures mostly type I IFN-inducible gene expression, 
+whereas the other two modules are likely induced by type II IFN (though type I 
+IFN-inducible may be captured as well).
+
+
+#### Read in SLE WB data (Entrez IDs)
+
+```{r}
+exprs.file <- file.path("data", "expression_data",
+                        "SLE_WB_all_microarray_QN_zto_before.pcl")
+exprs.df <- data.table::fread(exprs.file, data.table = FALSE)
+```
+
+#### Summarize modules' gene expression
+All SLE data
+```{r}
+# read in Tribe-converted genesets
+mod.file.list <- 
+  list(M1.2 = file.path("data", "module_genesets", 
+                        "Chiche et al M1.2 module-6b45452.csv"),
+       M3.4 = file.path("data", "module_genesets", 
+                        "Chiche et al M3.4 module-7ab0d0d.csv"),
+       M5.12 = file.path("data", "module_genesets", 
+                         "Chiche et al M5.12 module-f326fe4.csv"))
+
+entrez.mod.list <- lapply(mod.file.list, 
+                          function(x) ReadInTribeConversions(x))
+```
+
+```{r}
+# get expression summary (mean)
+mod.summary.list <- 
+  lapply(entrez.mod.list, function(x) GetGeneSetMean(x, exprs.df))
+
+# tidy
+mod.summary.df <- reshape2::melt(mod.summary.list)
+colnames(mod.summary.df) <- c("Source Name", "Summary", "Module")
+
+# write to file
+readr::write_tsv(x = mod.summary.df, 
+                 path = file.path(results.dir,
+                                  "SLE-WB_Chiche_et_al_module_summary.tsv"))
+```
+
+#### Sample-data relationship
+```{r}
+e.39088.sdrf <- data.table::fread(file.path("data", 
+                                            "sample_info",
+                                            "E-GEOD-39088.sdrf.txt"),
+                                  data.table = FALSE)
+array.att <- e.39088.sdrf[, c("Source Name",
+                              "Comment [Sample_characteristics]",
+                              "Characteristics [disease state]",
+                              "Comment [Sample_source_name]",
+                              "Comment [Sample_title]")]
+
+# source name must match exprs.df colnames (CEL file names) in order to
+# join df
+array.att <-
+  array.att %>%
+    dplyr::mutate(`Source Name` =  gsub(" 1", "", `Source Name`))
+array.att$`Source Name` <- 
+  unlist(lapply(array.att$`Source Name`, 
+         function(x) colnames(exprs.df)[grep(x, colnames(exprs.df))]))
+colnames(array.att)[2:ncol(array.att)] <- c("Day", "Disease state", 
+                                            "Treatment", "Patient")
+```
+
+#### Main
+
+```{r}
+# right join, only want arrays in this data set
+mod.meta.df <- 
+  dplyr::right_join(mod.summary.df, array.att, by = "Source Name")
+
+# baseline and healthy unstimulated only
+baseline.mod.df <- 
+  dplyr::bind_rows(dplyr::filter(mod.meta.df, Day == "day: 0"),
+                   dplyr::filter(mod.meta.df, 
+                                 `Disease state` == "healthy" & !(grepl("unstimulated",
+                                                                        Treatment))))
+rm(mod.meta.df)
+```
+```{r}
+p <- ggplot2::ggplot(baseline.mod.df,
+       ggplot2::aes(x = `Disease state`, y = Summary)) +
+  ggplot2::geom_jitter(ggplot2::aes(colour = `Disease state`), width = 0.2) + 
+  ggplot2::stat_summary(fun.y = "median", size = 4, shape = 18,
+                        geom = "point", color = "black") +
+  ggplot2::facet_grid(~ Module) +
+  ggplot2::theme_bw() + 
+  ggplot2::labs(y = "mean expression of genes in module\n(per sample)",
+                title = "IFN Modular Framework Expression - Baseline",
+                subtitle = "Lauwerys, et al.") +
+  ggplot2::scale_color_manual(values = c("seagreen3", "#3182bd")) +
+  ggplot2::theme(legend.position = "none")
+p
+```
+
+Note that the increase in `M1.2` expression was shown to be more strongly 
+induced by IFN-beta than IFN-alpha in Chiche, et al.
+
+```{r}
+# save plot
+plot.file <- file.path(plot.dir,
+                       "E-GEOD-39088_Chiche_et_al_baseline.pdf")
+p <- p + ggplot2::theme(text = ggplot2::element_text(size = 15))
+ggplot2::ggsave(plot.file, plot = p)
+```
+
+
+```{r}
+# which are likely the 9 IFN-negative patients in the original publication
+# we don't have these labels
+low.ifn.sle <- dplyr::filter(baseline.mod.df,
+                             `Disease state` == "SLE") %>%
+  dplyr::group_by(Module) %>%
+  dplyr::top_n((Summary * -1), n = 9)
+
+# call low samples 9 lowest M1.2 scores -- TYPE I INTERFERON
+low.ifn.samples <-low.ifn.sle$`Source Name`[low.ifn.sle$Module == "M1.2"]
+low.ifn.samples
+```
+
+```{r}
+# remove low ifn samples that are placebo, that will be its own category
+low.ifn.samples <- 
+  low.ifn.samples[!grepl("Placebo", 
+                         array.att$`Treatment`
+                         [array.att$`Source Name` %in% low.ifn.samples])]
+
+# get the treatment day (or timepoint information) from treatment column
+# and get the patient identifier from patient column
+array.att <-
+  array.att %>%
+    dplyr::mutate(Day = sub("^\\s+", "", sub(".*[,]", "", Treatment)),
+                  Patient = sub("^\\s+", "", sub(".*[,]", "", Patient)))
+# healthy controls do not have timepoint information, so replace with NA
+array.att$Day[!grepl(paste(c("day", "baseline"), collapse = "|"), 
+                            array.att$Day)] <- NA
+
+# add a column that contains grouping information (IFN-K treated, placebo
+# unstimulated control, stimulated control)
+array.att <- 
+  array.att %>%
+    dplyr::mutate(Group = 
+                    dplyr::case_when(
+                      grepl("IFN-K", array.att$Treatment) ~ "IFN-K",
+                      grepl("Placebo", array.att$Treatment) ~ "Placebo",
+                      grepl("absence", array.att$Treatment) ~
+                        "Control, no treatment",
+                      grepl("unstimulated = ", array.att$Treatment) ~
+                        "Control, stimulated"
+                    ))
+
+# which patients are in the following groups - placebo, IFN-positive, 
+# IFN-negative
+low.ifn.pat <- 
+  array.att$Patient[which(array.att$`Source Name` %in% low.ifn.samples)]
+placebo.pat <- unique(array.att$Patient[which(array.att$Group == "Placebo")])
+hi.ifn.pat <- setdiff(array.att$Patient, c(low.ifn.pat, placebo.pat))
+hi.ifn.pat <- hi.ifn.pat[grep("patient", hi.ifn.pat)]
+
+array.att <-
+  array.att %>% 
+    dplyr::mutate(`IFN-level` = rep(NA, nrow(array.att))) %>%
+    dplyr::mutate(`IFN-level` = dplyr::case_when(
+      (Patient %in% low.ifn.pat) ~ "IFN-negative", 
+      (Patient %in% placebo.pat) ~ "Placebo",
+      (Patient %in% hi.ifn.pat) ~ "IFN-positive"
+    ))
+
+# right join, only want arrays in this data set
+mod.meta.df <- 
+  dplyr::right_join(mod.summary.df, array.att, by = "Source Name")
+
+# write to file
+readr::write_tsv(mod.meta.df, 
+                 path = file.path(results.dir,
+                                  "E-GEOD-39088_Chiche_et_al_module.tsv"))
+```
+
+```{r}
+rm(list = setdiff(ls(), c("%>%", "mod.summary.df", "array.att",
+                          "results.dir", "plot.dir")))
+array.att <- dplyr::select(array.att, -`IFN-level`)
+```
+
+### PLIER trained on SLE WB compendium
+
+#### Load SLE WB PLIER
+```{r}
+sle.plier.results <- readRDS(file.path("results", "05", 
+                                       "SLE-WB_PLIER_model.RDS"))
+```
+
+```{r}
+# get summary data.frame and write to file
+sle.summary <- sle.plier.results$summary
+readr::write_tsv(sle.summary, 
+                 path = file.path("results", "05",
+                                  "SLE-WB_PLIER_summary.tsv"))
+```
+
+```{r}
+sle.summary %>% 
+  dplyr::filter(grepl("INTERFERON", pathway),
+                FDR < 0.05)
+```
+
+Note that IFN gamma signaling does not appear to be captured (at least at 
+FDR < 0.05) with this model.
+
+```{r}
+sle.b.df <- reshape2::melt(sle.plier.results$B)
+colnames(sle.b.df) <- c("Annotated", "Sample", "Value")
+sle.b.df <- dplyr::mutate(sle.b.df,
+                          LV = rep(paste0("LV", 1:nrow(sle.plier.results$B)),
+                                   ncol(sle.plier.results$B)))
+sle.b.df <- sle.b.df[, c("Sample", "LV", "Annotated", "Value")]
+readr::write_tsv(sle.b.df, 
+                 path = file.path("results", "05",
+                                  "SLE-WB_PLIER_B_tidy.tsv"))
+```
+
+Need to find which samples would be considered IFN-positive vs. 
+IFN-negative using this information
+```{r}
+ifn.b.df <- sle.b.df %>%
+              dplyr::filter(LV %in% c("LV6", "LV69", "LV110")) %>%
+              dplyr::right_join(y = array.att, by = c("Sample" = "Source Name"))
+
+baseline.df <- 
+  dplyr::bind_rows(dplyr::filter(ifn.b.df, Day == "baseline"),
+                   dplyr::filter(ifn.b.df, 
+                                 `Disease state` == "healthy" & !(grepl("unstimulated",
+                                                                        Treatment))))
+```
+
+```{r}
+p <- baseline.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = `Disease state`, y = Value)) +
+  ggplot2::geom_jitter(ggplot2::aes(colour = `Disease state`), width = 0.2) + 
+  ggplot2::stat_summary(fun.y = "median", size = 4, shape = 18,
+                        geom = "point", color = "black") +
+  ggplot2::facet_grid(~ LV) +
+  ggplot2::theme_bw() + 
+  ggplot2::labs(y = "LV value",
+                title = "SLE WB PLIER - Baseline",
+                subtitle = "Lauwerys, et al.") +
+  ggplot2::scale_color_manual(values = c("seagreen3", "#3182bd")) +
+  ggplot2::theme(legend.position = "none")
+p
+```
+
+```{r}
+# save plot
+plot.file <- file.path(plot.dir,
+                       "E-GEOD-39088_SLE-WB_PLIER_baseline.pdf")
+p <- p + ggplot2::theme(text = ggplot2::element_text(size = 15))
+ggplot2::ggsave(plot.file, plot = p)
+```
+
+
+```{r}
+# which are likely the 9 IFN-negative patients in 
+low.ifn.sle <- dplyr::filter(baseline.df,
+                             `Disease state` == "SLE") %>%
+  dplyr::group_by(LV) %>%
+  dplyr::top_n((Value * -1), n = 9) %>%
+  dplyr::arrange(LV)
+low.ifn.sle
+```
+
+```{r}
+table(low.ifn.sle$Patient)
+```
+
+We'll call anything that's one of the 9 lowest samples (in more than one LV) 
+IFN-negative for this method.
+
+```{r}
+low.ifn.pat <- names(table(low.ifn.sle$Patient))[table(low.ifn.sle$Patient) > 1]
+placebo.pat <- 
+  unique(baseline.df$Patient[which(baseline.df$Group == "Placebo")])
+# remove low IFN patients that are on placebo
+low.ifn.pat <- setdiff(low.ifn.pat, placebo.pat)
+hi.ifn.pat <- setdiff(array.att$Patient, c(low.ifn.pat, placebo.pat))
+hi.ifn.pat <- hi.ifn.pat[grep("patient", hi.ifn.pat)]
+
+ifn.b.df <-
+  ifn.b.df %>% 
+    dplyr::mutate(`IFN-level` = rep(NA, nrow(ifn.b.df))) %>%
+    dplyr::mutate(`IFN-level` = dplyr::case_when(
+      (Patient %in% low.ifn.pat) ~ "IFN-negative", 
+      (Patient %in% placebo.pat) ~ "Placebo",
+      (Patient %in% hi.ifn.pat) ~ "IFN-positive"
+    ))
+
+readr::write_tsv(ifn.b.df, 
+                 path = file.path(results.dir,
+                                  "E-GEOD-39088_SLE-WB_PLIER_IFN_B.tsv"))
+```
+
+```{r}
+rm(list = setdiff(ls(), c("%>%", "mod.summary.df", "array.att",
+                          "sle.b.df", "plot.dir", "results.dir")))
+```
+
+### PLIER trained on recount2
+
+```{r}
+# load recount2 PLIER model
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+```{r}
+# get summary data.frame and write to file
+recount.summary <- recount.plier$summary
+readr::write_tsv(recount.summary, 
+                 path = file.path(results.dir,
+                                  "recount2_PLIER_summary.tsv"))
+```
+
+```{r}
+recount.summary %>%
+  dplyr::filter(grepl("INTERFERON", pathway),
+                FDR < 0.05) %>%
+  dplyr::arrange(pathway, dplyr::desc(AUC))
+```
+
+The model trained on `recount2` captures both IFN-alpha/beta signaling _and_ 
+IFN-gamma signaling.
+Let's see what other pathways are associated with `LV25`, `LV34`, `LV116`, 
+`LV140`, `LV749`, and `LV827`.
+
+```{r}
+recount.summary %>%
+  dplyr::filter(`LV index` %in% c(25, 34, 116, 140, 749, 827),
+                FDR < 0.05) %>%
+  dplyr::arrange(dplyr::desc(AUC))
+```
+
+Let's investigate `LV116` and `LV140` further.
+
+#### Read in SLE B matrix (in recount2 space)
+```{r}
+# read in B matrix
+rec.b.file <- file.path("results", "07", "SLE-WB_B_matrix_recount2_model.RDS")
+recount.b.mat <- as.data.frame(readRDS(rec.b.file))
+recount.b.mat <- tibble::rownames_to_column(recount.b.mat, var = "Annotated")
+
+# reshape
+recount.b.df <- reshape2::melt(recount.b.mat)
+recount.b.df <- 
+  recount.b.df %>%
+    dplyr::mutate(LV = rep(paste0("LV", 1:nrow(recount.b.mat)),
+                           ncol(recount.b.mat) - 1))
+colnames(recount.b.df) <- c("Annotated", "Sample", "Value", "LV")
+recount.b.df <- recount.b.df[, c("Sample", "LV", "Annotated", "Value")]
+head(recount.b.df)
+```
+
+```{r}
+ifn.b.df <- recount.b.df %>%
+              dplyr::filter(LV %in% c("LV116", "LV140")) %>%
+              dplyr::right_join(y = array.att, by = c("Sample" = "Source Name"))
+
+baseline.df <- 
+  dplyr::bind_rows(dplyr::filter(ifn.b.df, Day == "baseline"),
+                   dplyr::filter(ifn.b.df, 
+                                 `Disease state` == "healthy" & !(grepl("unstimulated",
+                                                                        Treatment))))
+```
+
+```{r}
+p <- baseline.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = `Disease state`, y = Value)) +
+  ggplot2::geom_jitter(ggplot2::aes(colour = `Disease state`), width = 0.2) + 
+  ggplot2::stat_summary(fun.y = "median", size = 4, shape = 18,
+                        geom = "point", color = "black") +
+  ggplot2::facet_grid(~ LV) +
+  ggplot2::theme_bw() + 
+  ggplot2::labs(y = "LV value",
+                title = "recount PLIER - Baseline",
+                subtitle = "Lauwerys, et al.") +
+  ggplot2::scale_color_manual(values = c("seagreen3", "#3182bd")) +
+  ggplot2::theme(legend.position = "none")
+p
+```
+
+It looks like there's little difference between `LV140` in healthy controls and 
+patients with SLE (at baseline). 
+This LV should capture IFN-gamma signaling (much like `M3.4` and `M5.12`) and 
+it shows a similar pattern of expression to `M5.12`.
+
+```{r}
+# save plot
+plot.file <- file.path(plot.dir,
+                       "E-GEOD-39088_recount2_PLIER_baseline.pdf")
+p <- p + ggplot2::theme(text = ggplot2::element_text(size = 15))
+ggplot2::ggsave(plot.file, plot = p)
+```
+
+We'll call the 9 patients with the lowest `LV116` values at baseline IFN-negative in this method.
+
+```{r}
+# which are likely the 9 IFN-negative patients in 
+low.ifn.sle <- dplyr::filter(baseline.df,
+                             `Disease state` == "SLE",
+                             LV == "LV116") %>%
+  dplyr::group_by(LV) %>%
+  dplyr::top_n((Value * -1), n = 9)
+
+low.ifn.pat <- low.ifn.sle$Patient
+placebo.pat <- 
+  unique(baseline.df$Patient[which(baseline.df$Group == "Placebo")])
+# remove low IFN patients that are on placebo
+low.ifn.pat <- setdiff(low.ifn.pat, placebo.pat)
+hi.ifn.pat <- setdiff(array.att$Patient, c(low.ifn.pat, placebo.pat))
+hi.ifn.pat <- hi.ifn.pat[grep("patient", hi.ifn.pat)]
+```
+
+```{r}
+ifn.b.df <-
+  ifn.b.df %>% 
+    dplyr::mutate(`IFN-level` = rep(NA, nrow(ifn.b.df))) %>%
+    dplyr::mutate(`IFN-level` = dplyr::case_when(
+      (Patient %in% low.ifn.pat) ~ "IFN-negative", 
+      (Patient %in% placebo.pat) ~ "Placebo",
+      (Patient %in% hi.ifn.pat) ~ "IFN-positive"
+    ))
+
+readr::write_tsv(ifn.b.df, 
+                 path = file.path(results.dir,
+                                  "E-GEOD-39088_recount2_PLIER_IFN_B.tsv"))
+```
+
+```{r}
+rm(list = setdiff(ls(), c("%>%", "mod.summary.df", "recount.b.df",
+                          "sle.b.df", "plot.dir", "results.dir")))
+```
+
+## AMG 811
+**E-GEOD-78193; Welcher, et al. 2015.**
+
+I'll summarize some of the relevant points from Welcher, et al.:
+
+* AMG 811 is a monoclonal antibody against IFN-gamma (type II IFN).
+* Patients with SLE received either AMG 811 (different doses and/or 
+adminstration methods) or placebo.
+* Whole blood was collected from patients with SLE at day 1 (baseline), day 15, 
+day 56, and at the end of the study (EOS).
+* Whole blood was also collected from healthy controls and either stimulated 
+with IFN-gamma for (0, 24, or 48 hrs) or were untreated.
+The authors identified genes that were differentially expressed between 
+unstimulated and IFN-gamma stimulated samples (IFN-gamma signature).
+IFN-gamma scores calculated using these genes were similar to other 
+(previously published) IFN gene sets.
+* Post-treatment (AMG811) samples showed a significant decrease in a 
+number of the IFN-gamma signature genes 
+
+#### Sample-data relationship file
+
+```{r}
+e.78193.sdrf <- data.table::fread(file.path("data", 
+                                            "sample_info",
+                                            "E-GEOD-78193.sdrf.txt"),
+                                  data.table = FALSE)
+
+array.att <- e.78193.sdrf[, c("Source Name",
+                              "Comment [Sample_source_name]",
+                              "Characteristics [subject]",
+                              "Characteristics [treatment day]",
+                              "Comment [Sample_title]")]
+
+array.att <- 
+  array.att %>%
+    dplyr::mutate(Sample = sub(" 1", "", `Source Name`)) %>%
+    dplyr::select(-`Source Name`)
+
+colnames(array.att)[1:4] <- c("Disease state", "Subject", 
+                              "Day", "Treatment")
+
+
+# remove IFN-gamma stimulated samples, we won't be using them downstream
+array.att <-
+  array.att %>%
+  dplyr::filter(!(grepl("+ IFN-g", Treatment))) %>%
+  dplyr::select(-Treatment)
+
+array.att <-
+  array.att %>%
+  dplyr::mutate(`Disease state` =
+                  dplyr::recode(array.att$`Disease state`, 
+                                "systemic lupus erythematosus (SLE) patient" = "SLE",
+                                "healthy volunteer" = "healthy"))
+```
+
+### Modular transcriptional analyses
+
+```{r}
+# join sample information with the summary of the module gene sets
+mod.meta.df <- dplyr::right_join(mod.summary.df, array.att, 
+                                 by = c("Source Name" = "Sample"))
+# write to file
+mod.file <- file.path(results.dir,
+                      "E-GEOD-78193_Chiche_et_al_module.tsv")
+readr::write_tsv(mod.meta.df, path = mod.file)
+```
+
+```{r}
+rm(mod.file, mod.meta.df)
+```
+
+### PLIER trained on SLE WB compendium
+
+```{r}
+# join sample info with SLE WB PLIER LVs
+sle.b.meta.df <- dplyr::right_join(sle.b.df, array.att, by = "Sample") %>%
+  dplyr::filter(LV %in% c("LV6", "LV38", "LV41"))
+
+# write to file
+sle.b.file <- file.path("results", "E-GEOD-78193_SLE-WB_PLIER_IFN_B.tsv")
+readr::write_tsv(sle.b.meta.df, path = sle.b.file)
+```
+
+```{r}
+rm(sle.b.meta.df)
+```
+
+### PLIER trained on recount2
+
+```{r}
+# join sample info with SLE WB PLIER LVs
+rec.b.meta.df <- dplyr::right_join(recount.b.df, array.att, by = "Sample") %>%
+  dplyr::filter(LV %in% c("LV35", "LV1070"))
+
+# write to file
+rec.b.file <- file.path("results", "E-GEOD-78193_recount2_PLIER_IFN_B.tsv")
+readr::write_tsv(rec.b.meta.df, path = rec.b.file)
+```
+
