@@ -582,11 +582,9 @@ ifn.b.df <-
       (Patient %in% low.ifn.pat) ~ "IFN-negative", 
       (Patient %in% placebo.pat) ~ "Placebo",
       (Patient %in% hi.ifn.pat) ~ "IFN-positive"
-    ))
-
-readr::write_tsv(ifn.b.df, 
-                 path = file.path(results.dir,
-                                  "E-GEOD-39088_recount2_PLIER_IFN_B.tsv"))
+    )) %>%
+  readr::write_tsv(path = file.path(results.dir,
+                                    "E-GEOD-39088_recount2_PLIER_IFN_B.tsv"))
 ```
 
 ```{r}
