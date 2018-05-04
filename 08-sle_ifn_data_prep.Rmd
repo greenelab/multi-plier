@@ -87,12 +87,12 @@ GetGeneSetMean <- function(gene.set, exprs) {
   }
   
   `%>%` <- dplyr::`%>%`
+
+  summary.df <- exprs %>%
+                  dplyr::filter(Gene %in% gene.set) %>% 
+                  dplyr::select(-Gene) %>%
+                  dplyr::summarise_all(mean)
   
-  # get the genes in the gene set 
-  gene.set.exprs <- 
-    exprs[which(exprs$Gene %in% gene.set), 2:ncol(exprs)]
-  summary.df <- gene.set.exprs %>%
-    dplyr::summarise_all(mean)
   return(summary.df)
   
 }
@@ -160,7 +160,9 @@ exprs.df <- data.table::fread(exprs.file, data.table = FALSE)
 ```
 
 #### Summarize modules' gene expression
+
 All SLE data
+
 ```{r}
 # read in Tribe-converted genesets
 mod.file.list <- 
@@ -191,6 +193,7 @@ readr::write_tsv(x = mod.summary.df,
 ```
 
 #### Sample-data relationship
+
 ```{r}
 e.39088.sdrf <- data.table::fread(file.path("data", 
                                             "sample_info",
@@ -252,10 +255,9 @@ induced by IFN-beta than IFN-alpha in Chiche, et al.
 # save plot
 plot.file <- file.path(plot.dir,
                        "E-GEOD-39088_Chiche_et_al_baseline.pdf")
-p <- p + ggplot2::theme(text = ggplot2::element_text(size = 15))
-ggplot2::ggsave(plot.file, plot = p)
+ggplot2::ggsave(plot.file, plot = p + 
+                  ggplot2::theme(text = ggplot2::element_text(size = 15)))
 ```
-
 
 ```{r}
 # which are likely the 9 IFN-negative patients in the original publication
@@ -364,8 +366,8 @@ sle.b.df <- reshape2::melt(sle.plier.results$B)
 colnames(sle.b.df) <- c("Annotated", "Sample", "Value")
 sle.b.df <- dplyr::mutate(sle.b.df,
                           LV = rep(paste0("LV", 1:nrow(sle.plier.results$B)),
-                                   ncol(sle.plier.results$B)))
-sle.b.df <- sle.b.df[, c("Sample", "LV", "Annotated", "Value")]
+                                   ncol(sle.plier.results$B))) %>%
+              dplyr::select(c("Sample", "LV", "Annotated", "Value"))
 readr::write_tsv(sle.b.df, 
                  path = file.path("results", "05",
                                   "SLE-WB_PLIER_B_tidy.tsv"))
@@ -405,8 +407,8 @@ p
 # save plot
 plot.file <- file.path(plot.dir,
                        "E-GEOD-39088_SLE-WB_PLIER_baseline.pdf")
-p <- p + ggplot2::theme(text = ggplot2::element_text(size = 15))
-ggplot2::ggsave(plot.file, plot = p)
+ggplot2::ggsave(plot.file, plot = p + 
+                  ggplot2::theme(text = ggplot2::element_text(size = 15)))
 ```
 
 
@@ -493,6 +495,7 @@ recount.summary %>%
 Let's investigate `LV116` and `LV140` further.
 
 #### Read in SLE B matrix (in recount2 space)
+
 ```{r}
 # read in B matrix
 rec.b.file <- file.path("results", "07", "SLE-WB_B_matrix_recount2_model.RDS")
@@ -547,11 +550,12 @@ it shows a similar pattern of expression to `M5.12`.
 # save plot
 plot.file <- file.path(plot.dir,
                        "E-GEOD-39088_recount2_PLIER_baseline.pdf")
-p <- p + ggplot2::theme(text = ggplot2::element_text(size = 15))
-ggplot2::ggsave(plot.file, plot = p)
+ggplot2::ggsave(plot.file, plot = p + 
+                  ggplot2::theme(text = ggplot2::element_text(size = 15)))
 ```
 
-We'll call the 9 patients with the lowest `LV116` values at baseline IFN-negative in this method.
+We'll call the 9 patients with the lowest `LV116` values at baseline 
+IFN-negative in this method.
 
 ```{r}
 # which are likely the 9 IFN-negative patients in 
@@ -591,6 +595,7 @@ rm(list = setdiff(ls(), c("%>%", "mod.summary.df", "recount.b.df",
 ```
 
 ## AMG 811
+
 **E-GEOD-78193; Welcher, et al. 2015.**
 
 I'll summarize some of the relevant points from Welcher, et al.:
@@ -636,12 +641,9 @@ colnames(array.att)[1:4] <- c("Disease state", "Subject",
 array.att <-
   array.att %>%
   dplyr::filter(!(grepl("+ IFN-g", Treatment))) %>%
-  dplyr::select(-Treatment)
-
-array.att <-
-  array.att %>%
+  dplyr::select(-Treatment)  %>%
   dplyr::mutate(`Disease state` =
-                  dplyr::recode(array.att$`Disease state`, 
+                  dplyr::recode(`Disease state`, 
                                 "systemic lupus erythematosus (SLE) patient" = "SLE",
                                 "healthy volunteer" = "healthy"))
 ```
