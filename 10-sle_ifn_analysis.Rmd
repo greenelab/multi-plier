@@ -29,15 +29,15 @@ original papers, see the `7-sle_ifn_data_prep` notebook.
 
 ```{r}
 # plot and result directory setup for this notebook
-plot.dir <- file.path("plots", "09")
+plot.dir <- file.path("plots", "10")
 dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
-results.dir <- file.path("results", "09")
+results.dir <- file.path("results", "10")
 dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
 ```{r}
 # directory that was used for data prep
-data.prep.dir <- file.path("results", "08")
+data.prep.dir <- file.path("results", "09")
 ```
 
 ```{r}
