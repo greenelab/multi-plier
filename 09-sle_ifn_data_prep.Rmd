@@ -326,8 +326,8 @@ array.att <- dplyr::select(array.att, -`IFN-level`)
 ### PLIER trained on SLE WB compendium
 
 ```{r}
-sle.b.df <- readr::read_tsv(path = file.path("results", "05",
-                                             "SLE-WB_PLIER_B_tidy.tsv"))
+sle.b.df <- readr::read_tsv(file.path("results", "05",
+                                      "SLE-WB_PLIER_B_tidy.tsv"))
 ```
 
 Need to find which samples would be considered IFN-positive vs. 
