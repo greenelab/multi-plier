@@ -46,6 +46,7 @@ set.seed(123)
 ```
 
 ## IFN-K treatment
+
 **E-GEOD-39088; Lauwerys, et al. 2013.**
 
 ### Functions
@@ -118,7 +119,6 @@ CalculateChangeFromBaseline <- function(df, variable.id, value.id) {
   return(df)
 }
 
-# wrapper function for IFN-K boxplots, only useful 
 PlotChangeFromBaseline <- function(df, y.label, plot.title, plot.path,
                                    facets = "Module ~ Day",
                                    plot.subtitle = "Lauwerys, et al.") {
@@ -264,6 +264,7 @@ rm(list = setdiff(ls(), c("%>%", "results.dir", "plot.dir",
 ```
 
 ## AMG 811 
+
 **E-GEOD-78193; Welcher, et al. 2015.**
 
 ### Plotting Function
