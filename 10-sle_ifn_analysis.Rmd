@@ -1,0 +1,385 @@
+---
+title: "SLE IFN modulatory therapies: Analysis"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In this notebook, we'll examine how IFN-inducible or IFN-associated gene 
+signatures change during treatment with targeted therapies that are designed to 
+block the action of some IFNs.
+
+Briefly, we'll look at two therapies in the context of SLE: IFN-K (which blocks 
+IFN-alpha, type I IFN; 
+[Lauwerys, et al. _Arthritis Rheum._ 2013.](https://doi.org/10.1002/art.37785)) 
+and AMG 811 (which blocks IFN-gamma, type II IFN; 
+[Welcher, et al. _Arthritis Rheumatol._ 2015.](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5054935/)).
+
+For a little more background, including summaries of the main findings in the 
+original papers, see the `7-sle_ifn_data_prep` notebook.
+
+## Directory setup
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "10")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "10")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+```{r}
+# directory that was used for data prep
+data.prep.dir <- file.path("results", "09")
+```
+
+```{r}
+# set seed for reproducibility (plot jitter)
+set.seed(123)
+```
+
+## IFN-K treatment
+
+**E-GEOD-39088; Lauwerys, et al. 2013.**
+
+### Functions
+
+In the IFN-K trial specifically, we'll examine how IFN expression has 
+changed from baseline.
+This is similar to the analyses performed in the original paper. 
+We need a custom function for this and for plotting, as we'll be repeating this
+with three different methods: modular framework, SLE WB PLIER, recount2 PLIER.
+
+```{r}
+CalculateChangeFromBaseline <- function(df, variable.id, value.id) {
+  # Given a data.frame that contains values (value.id) from the longitudinal 
+  # study E-GEOD-39088, this function will calculate the change in expression
+  # level from baseline. Not intended for use outside this context (& env)!
+  #
+  # Args:
+  #   df: data.frame that contains day, some variable (i.e., module or latent
+  #       variable id), and the value for that variable (i.e., mean expression);
+  #       must contain Day and Patient columns
+  #   variable.id: the name of the column that contains the module or latent
+  #               variable identifier 
+  #   value.id: the name of the column that contains the values to be subtracted
+  #             from one another (e.g., contains mean expression for a sample
+  #             for above variable)
+  # 
+  # Returns:
+  #  df with the calculated changes appended in the "Change" column
+  
+  col.check <- all(("Day" %in% colnames(df)), ("Patient" %in% colnames(df)))
+  if (!col.check) {
+    stop("This function expects the input data.frame to contain colnames 
+         'Day' and 'Patient'")
+  }
+  
+  input.col.check <- all((variable.id %in% colnames(df)), 
+                          (value.id %in% colnames(df)))
+  if (!input.col.check) {
+    stop("One or more of 'variable.id' and 'value.id' are not in
+         colnames(df)")
+  }
+  
+  if (!("baseline" %in% df$Day)) {
+    stop("baseline should be a time point in Day column")
+  }
+  
+  change.summary <- rep(NA, nrow(df))
+  # for each patient, how has the value changed?
+  for (pat in unique(df$Patient)) {
+    # for each variable (e.g., module)
+    for(var.iter in unique(df[, variable.id])) {
+      # identify the baseline value index
+      baseline.indx <- which(df[, variable.id] == var.iter & 
+                               df$Patient == pat &
+                               df$Day == "baseline")
+      # for all days, including baseline (baseline should equal zero)
+      for(day in unique(df$Day)) {
+        day.indx <- which(df[, variable.id] == var.iter & 
+                            df$Patient == pat &
+                            df$Day == day)
+        # subtract the baseline value from the day value
+        change.summary[day.indx] <- 
+          df[, value.id][day.indx] - df[, value.id][baseline.indx]
+      }
+    }
+  }
+  
+  # add this column to the data.frame
+  df$Change <- change.summary 
+  return(df)
+}
+
+PlotChangeFromBaseline <- function(df, y.label, plot.title, plot.path,
+                                   facets = "Module ~ Day",
+                                   plot.subtitle = "Lauwerys, et al.") {
+  # Given a data.frame that with calculated changes from baseline 
+  # (from CalculateChangeFromBaseline), make boxplots comparing the three groups
+  # of patients -- placebo, IFN-negative, IFN-positive -- for each variable
+  # (e.g. module) ~ each day of the study (e.g., day 112, day 168)
+  # Not intended for use outside this context (& env)!
+  #
+  # Args:
+  #   df: data.frame output from CalculateChangeFromBaseline
+  #   y.label: y-axis label (string)
+  #   plot.title: plot title (string)
+  #   plot.path: full path for plot file (string)
+  #   facets: formula passed to ggplot2::facet_wrap(), default is "Module ~ Day"
+  #   plot.subtitle: plot subtitle (string)
+  #
+  # Returns:
+  #   NULL; plot saved at plot.path
+  
+  # reorder IFN-level for display
+  df$`IFN-level` <- 
+   factor(df$`IFN-level`,
+          levels = c("Placebo", "IFN-negative", "IFN-positive"))
+
+  # plot
+  p <- ggplot2::ggplot(dplyr::filter(df, Day != "baseline"), 
+                       ggplot2::aes(x = `IFN-level`, 
+                                    y = `Change`, color = `IFN-level`)) +
+    ggplot2::geom_boxplot(notch = TRUE) + 
+    ggplot2::theme_bw() + 
+    ggplot2::geom_jitter(alpha = 0.5, width = 0.2) +
+    ggplot2::facet_wrap(as.formula(facets), ncol = 2) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+                   legend.position = "none", 
+                   text = ggplot2::element_text(size = 15)) +
+    ggplot2::labs(y = y.label,
+                  title = plot.title,
+                  subtitle = plot.subtitle) +
+    ggplot2::scale_color_manual(values = c("#969696", "#8073ac", "#e08214"))
+  
+  ggplot2::ggsave(plot.path, plot = p, width = 8.5, height = 14, units = "in")
+}
+```
+
+### Modular transcriptional analyses
+
+```{r}
+# read in tidy data
+mod.file <- file.path(data.prep.dir, "E-GEOD-39088_Chiche_et_al_module.tsv")
+mod.summary.df <- readr::read_tsv(mod.file)
+```
+
+```{r}
+# only keep SLE patients
+ifn.summary.df <-   
+  mod.summary.df %>% 
+    dplyr::filter(grepl("SLE patient", Patient))
+
+ifn.summary.df <- 
+  CalculateChangeFromBaseline(df = as.data.frame(ifn.summary.df),
+                              variable.id = "Module",
+                              value.id = "Summary")
+```
+
+#### Plot
+
+```{r}
+plot.file <- file.path(plot.dir, "E-GEOD-39088_IFNk_Chiche_modules_change.pdf")
+PlotChangeFromBaseline(df = ifn.summary.df,
+                       y.label = "Change in Expression Summary",
+                       plot.title = "IFN Modular Framework Expression - 
+                          IFN-K treatment",
+                       plot.path = plot.file)
+```
+
+```{r}
+rm(list = setdiff(ls(), c("%>%", "CalculateChangeFromBaseline",
+                          "PlotChangeFromBaseline",
+                          "plot.dir", "results.dir", "data.prep.dir")))
+```
+
+### PLIER trained on SLE WB compendium
+
+```{r}
+sle.b.file <- file.path(data.prep.dir, "E-GEOD-39088_SLE-WB_PLIER_IFN_B.tsv")
+sle.b.df <- readr::read_tsv(sle.b.file)
+```
+
+```{r}
+# SLE patients only
+ifn.b.df <- sle.b.df %>%
+  dplyr::filter(grepl("SLE patient", Patient))
+
+ifn.b.df <- CalculateChangeFromBaseline(df = as.data.frame(ifn.b.df),
+                                        variable.id = "LV",
+                                        value.id = "Value")
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "E-GEOD-39088_IFNk_SLE_PLIER_change.pdf")
+PlotChangeFromBaseline(df = ifn.b.df,
+                       y.label = "Change in LV value",
+                       plot.title = "SLE WB PLIER - IFN-K treatment",
+                       plot.path = plot.file,
+                       facets = "LV ~ Day")
+```
+
+```{r}
+rm(list = setdiff(ls(), c("%>%", "CalculateChangeFromBaseline",
+                          "PlotChangeFromBaseline",
+                          "plot.dir", "results.dir", "data.prep.dir")))
+```
+
+### PLIER trained on `recount2`
+
+```{r}
+recount.b.file <- file.path(data.prep.dir, 
+                            "E-GEOD-39088_recount2_PLIER_IFN_B.tsv")
+recount.b.df <- readr::read_tsv(recount.b.file)
+```
+```{r}
+# SLE patients only
+ifn.b.df <- recount.b.df %>%
+  dplyr::filter(grepl("SLE patient", Patient))
+
+ifn.b.df <- CalculateChangeFromBaseline(df = as.data.frame(ifn.b.df),
+                                        variable.id = "LV",
+                                        value.id = "Value")
+```
+```{r}
+# plot
+plot.file <- file.path(plot.dir, "E-GEOD-39088_IFNk_recount2_PLIER_change.pdf")
+PlotChangeFromBaseline(df = ifn.b.df,
+                       y.label = "Change in LV value",
+                       plot.title = "recount2 PLIER - IFN-K treatment",
+                       plot.path = plot.file,
+                       facets = "LV ~ Day")
+```
+```{r}
+rm(list = setdiff(ls(), c("%>%", "results.dir", "plot.dir", 
+                          "data.prep.dir")))
+```
+
+## AMG 811 
+
+**E-GEOD-78193; Welcher, et al. 2015.**
+
+### Plotting Function
+
+We'll want to generate a boxplot the interaction between disease state (e.g.,
+healthy, SLE) and time point (day of trial) for each of the three methods.
+We'll write a custom plotting function for this.
+
+```{r}
+PlotInteraction <- function(df, y.var, wrap.var, y.label, plot.title,
+                            plot.subtitle = "Welcher, et al.") {
+  # Given a data.frame that contains a "summary" expression level of some kind
+  # for E-GEOD-78193 samples, make a boxplot where x/groups are 
+  # interaction(Disease state, Day).  Not intended for use outside this 
+  # context (& env)!
+  #
+  # Args:
+  #   df: a (long form) data.frame containing the measurements for E-GEOD-78193
+  #   y.var: variable used as y.var (string; evaluated with ggplot2::aes_string)
+  #   wrap.var: string passed to ggplot2::facet_wrap; used for multiple LVs 
+  #             or modules
+  #   y.label: string, label for y-axis 
+  #   plot.title: string, plot title
+  #   plot.subtitle: string, plot subtitle; default "Welcher, et al."
+  #
+  # Returns:
+  #   ggplot2::ggplot object
+  
+  ggplot2::ggplot(df, 
+                  ggplot2::aes(x = interaction(`Disease state`, 
+                                           `Day`), 
+                               fill = interaction(`Disease state`, 
+                                                  `Day`))) + 
+    ggplot2::geom_boxplot(ggplot2::aes_string(y = y.var)) + 
+    ggplot2::geom_point(ggplot2::aes_string(y = y.var),
+                        alpha = 0.3, position = "jitter") +
+    ggplot2::facet_wrap(as.formula(paste("~", wrap.var))) +
+    ggplot2::theme_bw() + 
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+                   legend.position = "none",
+                   text = ggplot2::element_text(size = 15)) +
+    ggplot2::labs(x = "interaction(Disease State, Day)",
+                  y = y.label,
+                  title = plot.title,
+                  subtitle = plot.subtitle) +
+    ggplot2::scale_fill_manual(values = c("seagreen3", "#deebf7", "#9ecae1",
+                                          "#3182bd", "white")) +
+    ggplot2::scale_x_discrete(labels = c("healthy", "SLE baseline", 
+                                         "SLE day 15", "SLE day 56", 
+                                         "SLE EOS"))
+}
+
+```
+
+### Modular transcriptional analyses
+
+```{r}
+mod.file <- file.path(data.prep.dir,
+                      "E-GEOD-78193_Chiche_et_al_module.tsv")
+mod.summary.df <- readr::read_tsv(mod.file)
+```
+
+```{r}
+p <- PlotInteraction(df = mod.summary.df,
+                     y.var = "Summary",
+                     wrap.var = "Module",
+                     y.label = "Mean expression of genes in module (per sample)",
+                     plot.title = "IFN Modular Framework Expression - Treatment with AMG 811")
+
+plot.file <- file.path(plot.dir, "E-GEOD-78193_Chiche_et_al_boxplot.pdf")
+ggplot2::ggsave(plot.file, plot = p, width = 11, height = 7, units = "in")
+```
+
+```{r}
+rm(list = setdiff(ls(), c("%>%", "results.dir", "plot.dir", 
+                          "data.prep.dir", "PlotInteraction")))
+```
+
+### PLIER trained on SLE WB compendium
+
+```{r}
+sle.b.file <- file.path(data.prep.dir, "E-GEOD-78193_SLE-WB_PLIER_IFN_B.tsv")
+sle.b.df <- readr::read_tsv(sle.b.file)
+```
+
+```{r}
+p <- PlotInteraction(df = sle.b.df,
+                     y.var = "Value",
+                     wrap.var = "LV",
+                     y.label = "LV value",
+                     plot.title = "SLE WB PLIER - Treatment with AMG 811")
+
+plot.file <- file.path(plot.dir, "E-GEOD-78193_SLE_PLIER_boxplot.pdf")
+ggplot2::ggsave(plot.file, plot = p, width = 11, height = 7, units = "in")
+```
+
+```{r}
+rm(list = setdiff(ls(), c("%>%", "results.dir", "plot.dir", 
+                          "data.prep.dir", "PlotInteraction")))
+```
+
+### PLIER trained on `recount2`
+
+```{r}
+recount.b.file <- file.path(data.prep.dir, 
+                            "E-GEOD-78193_recount2_PLIER_IFN_B.tsv")
+recount.b.df <- readr::read_tsv(recount.b.file)
+```
+```{r}
+p <- PlotInteraction(df = recount.b.df,
+                     y.var = "Value",
+                     wrap.var = "LV",
+                     y.label = "LV value",
+                     plot.title = "SLE WB PLIER - Treatment with AMG 811")
+
+plot.file <- file.path(plot.dir, "E-GEOD-78193_recount2_PLIER_boxplot.pdf")
+ggplot2::ggsave(plot.file, plot = p, width = 11, height = 7, units = "in")
+```
