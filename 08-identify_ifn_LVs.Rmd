@@ -1,0 +1,122 @@
+---
+title: "Identify Interferon-associated LVs in PLIER models"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+The SLE WB compendium contains two data sets that examine interferon (IFN) 
+modulating treatments. 
+For context, IFNs are signaling molecules that modulate the immune response and 
+there are multiple types:
+
+* Type I - IFN-alpha, IFN-beta
+* Type II - IFN-gamma
+* Type III which are less well-characterized than I & II
+
+We're concerned with types I and II because these are the types we expect to be 
+modulated by the treatments included in the data we're working with (see more 
+information in a data preparation notebook).
+It's also worth noting that it can be difficult to distinguish between the two 
+when it comes to gene expression data, i.e., asking which interferon is inducing
+changes in gene expression can be tricky.
+
+In this notebook, we'll identify latent variables in the SLE WB and recount2
+PLIER models that are significantly associated with IFN-related gene sets.
+
+## Pipe and directory setup
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "08")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "08")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## PLIER trained on SLE WB compendium
+
+```{r}
+sle.plier.results <- readRDS(file.path("results", "05", 
+                                       "SLE-WB_PLIER_model.RDS"))
+```
+
+```{r}
+# get summary data.frame and write to file
+sle.summary <- sle.plier.results$summary
+readr::write_tsv(sle.summary, 
+                 path = file.path("results", "05",
+                                  "SLE-WB_PLIER_summary.tsv"))
+```
+
+```{r}
+sle.summary %>% 
+  dplyr::filter(grepl("INTERFERON", pathway),
+                FDR < 0.05)
+```
+
+Note that IFN gamma signaling (type II IFN) does not appear to be captured 
+(at least at FDR < 0.05) with this model.
+Let's take a look at the other gene sets significantly associated with
+these LVs.
+
+```{r}
+sle.summary %>%
+  dplyr::filter(`LV index` %in% c(6, 69, 110),
+                FDR < 0.05)
+```
+```{r}
+sle.b.df <- reshape2::melt(sle.plier.results$B)
+colnames(sle.b.df) <- c("Annotated", "Sample", "Value")
+sle.b.df <- dplyr::mutate(sle.b.df,
+                          LV = rep(paste0("LV", 1:nrow(sle.plier.results$B)),
+                                   ncol(sle.plier.results$B))) %>%
+              dplyr::select(c("Sample", "LV", "Annotated", "Value"))
+readr::write_tsv(sle.b.df, 
+                 path = file.path("results", "05",
+                                  "SLE-WB_PLIER_B_tidy.tsv"))
+```
+
+## PLIER trained on recount2
+
+```{r}
+# load recount2 PLIER model
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+```{r}
+# get summary data.frame and write to file
+recount.summary <- recount.plier$summary
+readr::write_tsv(recount.summary, 
+                 path = file.path(results.dir,
+                                  "recount2_PLIER_summary.tsv"))
+```
+
+```{r}
+recount.summary %>%
+  dplyr::filter(grepl("INTERFERON", pathway),
+                FDR < 0.05) %>%
+  dplyr::arrange(pathway, dplyr::desc(AUC))
+```
+
+The model trained on `recount2` captures both IFN-alpha/beta signaling _and_ 
+IFN-gamma signaling.
+Let's see what other pathways are associated with `LV25`, `LV34`, `LV116`, 
+`LV140`, `LV749`, and `LV827`.
+
+```{r}
+recount.summary %>%
+  dplyr::filter(`LV index` %in% c(25, 34, 116, 140, 749, 827),
+                FDR < 0.05) %>%
+  dplyr::arrange(dplyr::desc(AUC))
+```
+
+We'll investigate `LV116` and `LV140` further.
