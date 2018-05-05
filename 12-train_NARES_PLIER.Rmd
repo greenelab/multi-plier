@@ -1,0 +1,200 @@
+---
+title: "Train a PLIER model on the NARES data"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+The NARES study was published in the following article:
+
+> Grayson PC, Steiling K, Platt M, et al. [Defining the Nasal Transcriptome in Granulomatosis with Polyangiitis](https://dx.doi.org/10.100art.39185). _Arthritis & Rheumatology_, 2015. doi: 10.1002/art.39185.
+
+We processed this data in the [`greenelab/rheum-data-plier`](https://github.com/greenelab/rheum-plier-data) 
+repo.
+
+This dataset (`n = 77`) contains nasal brushing samples from patients with 
+granulomatosis with polyangiitis (GPA), a form of ANCA-associated vasculitis. 
+Patients with GPA either had active, a prior history of, or no history of 
+nasal disease.
+A composite comparator group of patients with sarcoidosis, patients with
+allergic rhinitis and healthy controls is also included.
+
+Here we'll train a PLIER model and explore:
+
+  * The sparsity of the U matrix
+  * How many LVs are recovered? How many pathways?
+  * What are the pathways that are represented?
+
+## Libraries
+
+```{r}
+library(AnnotationDbi)
+library(PLIER)
+```
+
+## NARES data
+
+```{r}
+nares.data <- readr::read_tsv(file.path("data", "expression_data", 
+                                         "NARES_SCANfast_ComBat.pcl"))
+
+symbol.obj <- org.Hs.eg.db::org.Hs.egSYMBOL
+mapped.genes <- AnnotationDbi::mappedkeys(symbol.obj)
+symbol.list <- as.list(symbol.obj[mapped.genes])
+symbol.df <- as.data.frame(cbind(names(symbol.list), unlist(symbol.list)))
+colnames(symbol.df) <- c("EntrezID", "GeneSymbol")
+
+# get gene column name to match to facilitate use with dplyr
+colnames(nares.data)[1] <- "EntrezID"
+
+# matching types
+symbol.df$EntrezID <- as.integer(as.character(symbol.df$EntrezID))
+
+# inner join
+annot.nares.data <- dplyr::inner_join(symbol.df, nares.data, by = "EntrezID")
+
+symbol.file <- 
+  file.path("data", "expression_data", 
+            "NARES_SCANfast_ComBat_with_GeneSymbol.pcl")
+
+readr::write_delim(annot.nares.data, path = symbol.file, delim = "\t")
+
+# only leave the matrix with gene symbol as rownames
+exprs.mat <- dplyr::select(annot.nares.data, -EntrezID)
+rownames(exprs.mat) <- exprs.mat$GeneSymbol
+exprs.mat <- as.matrix(dplyr::select(exprs.mat, -GeneSymbol))
+rm(list = setdiff(ls(), c("exprs.mat")))
+```
+
+## Functions and directory set up
+
+Organized this way for convenience w.r.t. removing objects from the environment
+after gene identifier conversion.
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "12")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "12")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## PLIER model
+
+### Training
+
+```{r}
+# train model and save to file
+nares.plier <- PLIERNewData(exprs.mat)
+plier.file <- file.path(results.dir, "NARES_PLIER_model.RDS")
+saveRDS(nares.plier, file = plier.file)
+
+# save summary data.frame to results
+summary.file <- file.path(results.dir, "NARES_summary.tsv")
+readr::write_tsv(nares.plier$summary, path = summary.file)
+```
+
+### Number of LVs
+
+```{r}
+nrow(nares.plier$B)
+```
+
+The model learns 34 latent variables. 
+From the trace during training, we know that 15 of them have `AUC>0.70`.
+
+### Examine U and pathway coverage
+
+As noted in the SLE WB PLIER notebook:
+
+> `U` is the prior information coefficient matrix; it tells us how 
+the prior information in the form of pathways/gene sets relates to LVs.
+
+```{r}
+PLIER::plotU(nares.plier, fontsize_row = 7)
+```
+
+To summarize *some* of these results:
+
+* A latent variable associated with extracellular matrix formation is captured. 
+`LV14` is associated with 
+[`REACTOME_EXTRACELLULAR_MATRIX_ORGANIZATION`](http://software.broadinstitute.org/gsea/msigdb/cards/REACTOME_EXTRACELLULAR_MATRIX_ORGANIZATION.html), 
+[`REACTOME_COLLAGEN_FORMATION`](http://software.broadinstitute.org/gsea/msigdb/cards/REACTOME_COLLAGEN_FORMATION.html),
+and [`PID_INTEGRIN1_PATHWAY`](http://software.broadinstitute.org/gsea/msigdb/cards/PID_INTEGRIN1_PATHWAY.html).
+* There's a neutrophil-associated LV, `LV3`.
+* Interferon signaling is probably captured by `LV25`, but two immune cell 
+types, M1 macrophages and CD8 T cells, are also associated with this LV.
+This is likely due to their production of or activation by IFN and we saw a bit
+of this overlap with cell types in other models (SLE WB, recount2).
+
+```{r}
+# save U plot to file
+pdf(file.path(plot.dir, "NARES_U_plot.pdf"), height = 5, width = 7)
+PLIER::plotU(nares.plier, fontsize_row = 8, fontsize_col = 8)
+dev.off()
+```
+
+#### What proportion of the pathways input into the PLIER model are 
+significantly associated with at least one LV?
+
+```{r}
+coverage.results <- GetPathwayCoverage(nares.plier)  # FDR < 0.05 by default
+coverage.results$pathway
+```
+
+Less than 10% of the pathways we are interested in are significantly associated
+with a latent variable.
+
+#### How sparse is U?
+
+Take into account _all_ pathways
+```{r}
+u.sparsity.all <- CalculateUSparsity(nares.plier,
+                                     significant.only = FALSE)
+ggplot2::ggplot(as.data.frame(u.sparsity.all),
+                ggplot2::aes(x = u.sparsity.all)) +
+  ggplot2::geom_density(fill = "blue", alpha = 0.5) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "proportion of positive entries in U",
+                title = "All LVs")
+```
+
+```{r}
+summary(u.sparsity.all)
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "NARES_U_sparsity_all.png")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+What proportion of entries in the U matrix for each LV are significantly
+associated with that LV?
+
+```{r}
+u.sparsity.sig <- CalculateUSparsity(nares.plier,
+                                     significant.only = TRUE)
+ggplot2::ggplot(as.data.frame(u.sparsity.sig),
+                ggplot2::aes(x = u.sparsity.sig)) +
+  ggplot2::geom_density(fill = "blue", alpha = 0.5) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "proportion of positive entries in U",
+                title = "Pathway-associated LVs")
+```
+
+```{r}
+summary(u.sparsity.sig)
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "NARES_U_sparsity_significant.png")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
