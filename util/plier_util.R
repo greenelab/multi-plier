@@ -86,6 +86,9 @@ GetOrderedRowNorm <- function(exprs.mat, plier.model) {
   miss.mat <- matrix(0, ncol = ncol(exprs.cg), nrow = length(genes.not.exprs))
   # set gene names (rownames) to missing gene names
   rownames(miss.mat) <- genes.not.exprs
+  # set colnames to the same as the expression matrix for genes present in
+  # exprs.mat
+  colnames(miss.mat) <- colnames(exprs.cg)
   # add into common gene expression matrix
   exprs.cg <- rbind(exprs.cg, miss.mat)
   # reorder rows
