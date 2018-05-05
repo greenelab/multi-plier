@@ -15,7 +15,7 @@ The NARES study was published in the following article:
 We processed this data in the [`greenelab/rheum-data-plier`](https://github.com/greenelab/rheum-plier-data) 
 repo.
 
-This dataset (`n = 77`) contains nasal brushing samples from patients with 
+This dataset (`n = 76`) contains nasal brushing samples from patients with 
 granulomatosis with polyangiitis (GPA), a form of ANCA-associated vasculitis. 
 Patients with GPA either had active, a prior history of, or no history of 
 nasal disease.
