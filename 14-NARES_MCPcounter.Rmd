@@ -1,0 +1,186 @@
+---
+title: "NARES MCPcounter"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+In our analysis of the SLE WB compendium, we were able to do evaluations 
+structured around cell types because we had neutrophil counts in one of the 
+datasets under consideration.
+For NARES, we do not have any information about the cell type composition of
+the samples (e.g., histological data, which can be semi-quantitative in nature).
+
+[MCPcounter](https://github.com/ebecht/MCPcounter/tree/a79614eee002c88c64725d69140c7653e7c379b4) 
+([Becht, et al. _Genome Biology_. 2016.](https://doi.org/10.1186/s13059-016-1070-5))
+is a method for estimating cell type abundance in solid tissues.
+The original paper also explicitly tested the approach in non-cancerous 
+tissues.
+(Many methods for immune infiltrate estimation are developed in the context
+of the tumor microenvironment. Note that in the 
+[PLIER preprint](https://doi.org/10.1101/116061), PLIER compared favorably to 
+another method, [CIBERSORT](https://cibersort.stanford.edu) 
+([Newman, et al. _Nature Methods._ 2015.](https://doi.org10.1038/nmeth.3337)), 
+when using CyTOF measurements as a gold standard.) 
+
+In our analysis of the NARES PLIER model, we noted that the neutrophil and
+ECM signals appeared to be among the strongest in the NARES gene expression 
+data. In this notebook, we're interested if PLIER neutrophil-associated LVs, 
+both from the NARES and recount2 models, are well-correlated with the neutrophil 
+estimates from MCPcounter.
+
+PLIER has appealing features over MCPcounter: it is explicitly designed to 
+capture biological signal _outside_ cell types (e.g., canonical pathways) and, 
+because it doesn't only learn geneset-associated LVs, can model technical 
+variance. If we get similar estimates with the two methods (particularly with
+the multi-PLIER approach), it supports the notion that a single method/model can
+be useful for a broad set of biological questions & contexts.
+
+## Install MCPcounter
+
+This is not currently in the Docker image we're using for this project.
+
+```{r}
+devtools::install_github("ebecht/MCPcounter", 
+                         ref = "a79614eee002c88c64725d69140c7653e7c379b4",
+                         subdir = "Source",
+                         dependencies = TRUE)
+```
+
+## Functions and directory setup
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "14")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "14")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+### NARES expression
+
+```{r}
+# get NARES expression matrix
+exprs.file <- file.path("data", "expression_data", 
+                        "NARES_SCANfast_ComBat_with_GeneSymbol.pcl")
+exprs.df <- data.table::fread(exprs.file, data.table = FALSE)
+exprs.mat <- dplyr::select(exprs.df, -(EntrezID:GeneSymbol))
+rownames(exprs.mat) <- exprs.df$GeneSymbol
+rm(exprs.df)
+```
+
+### NARES PLIER model
+
+```{r}
+nares.plier.file <- file.path("results", "12", "NARES_PLIER_model.RDS")
+nares.plier <- readRDS(nares.plier.file)
+nares.b <- nares.plier$B
+```
+
+### recount2 NARES B
+
+```{r}
+recount.b.file <- file.path("results", "13", "NARES_recount2_B.RDS")
+recount.b <- readRDS(file = recount.b.file)
+```
+
+## Run MCPcounter
+
+```{r}
+mcp.results <- 
+  MCPcounter::MCPcounter.estimate(exprs.mat, featuresType = "HUGO_symbols")
+mcp.melt <- reshape2::melt(mcp.results)
+colnames(mcp.melt) <- c("Cell_type", "Sample", "MCP_estimate")
+readr::write_tsv(mcp.melt, 
+                 file.path(results.dir, 
+                           "NARES_ComBat_MCPCounter_results_tidy.tsv"))
+```
+
+## Compare to PLIER LVs
+
+`NARES LV3` was the neutrophil-associated LV in the NARES PLIER model; its
+best match is `recount LV603` on the basis of the `Z` matrices 
+(`13-compare_NARES_B`). 
+`recount LV603` also appears to be pretty neutrophil-specific (not significantly
+associated with other myeloid cell types; `07-sle_cell_type_recount2_model`). 
+These are the LVs we'll compare to the MCPcounter estimates.
+
+### Data wrangling
+
+```{r}
+# tidy neutrophil-associated LVs
+neutro.lv.df <- as.data.frame(nares.b[3 ,])
+neutro.lv.df <- tibble::rownames_to_column(neutro.lv.df)
+colnames(neutro.lv.df) <- c("Sample", "NARES_LV3")
+recount.lv.df <- as.data.frame(recount.b["603,SVM Neutrophils", ])
+recount.lv.df <- tibble::rownames_to_column(recount.lv.df)
+colnames(recount.lv.df) <- c("Sample", "recount_LV603")
+neutro.lv.df <- dplyr::inner_join(neutro.lv.df, recount.lv.df, 
+                                  by = "Sample")
+```
+```{r}
+head(neutro.lv.df)
+```
+
+```{r}
+# join with MCPcounter neutrophil estimates
+neutro.df <- 
+  dplyr::inner_join(x = dplyr::filter(mcp.melt, Cell_type == "Neutrophils"),
+                    y = neutro.lv.df, by = "Sample")
+```
+
+### Plotting
+
+```{r}
+summary(lm(neutro.df$MCP_estimate ~ neutro.df$NARES_LV3))
+```
+
+```{r}
+nares.p <- neutro.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = NARES_LV3, y = MCP_estimate)) +
+  ggplot2::geom_point(alpha = 0.7) +
+  ggplot2::geom_smooth(method = "lm") +
+  ggplot2::theme_bw() +
+  ggplot2::labs(title = "NARES PLIER model",
+                y = "MCPcounter Neutrophil Estimate",
+                x = "NARES LV3") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
+                 text = ggplot2::element_text(size = 15)) +
+  ggplot2::annotate(geom = "text", x = -0.1, y = 2.25, 
+                    label = "r-squared = 0.98")
+nares.p
+```
+
+```{r}
+summary(lm(neutro.df$MCP_estimate ~ neutro.df$recount_LV603))
+```
+
+```{r}
+recount.p <- neutro.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = recount_LV603, y = MCP_estimate)) +
+  ggplot2::geom_point(alpha = 0.7) +
+  ggplot2::geom_smooth(method = "lm") +
+  ggplot2::theme_bw() +
+  ggplot2::labs(title = "recount2 PLIER model",
+                y = "MCPcounter Neutrophil Estimate",
+                x = "recount LV603") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
+                 text = ggplot2::element_text(size = 15)) +
+  ggplot2::annotate(geom = "text", x = -0.1, y = 2.5, 
+                    label = "r-squared = 0.90")
+recount.p
+```
+
+```{r}
+pdf(file.path(plot.dir, "NARES_MCPcounter_model_comparison.pdf"), width = 14,
+    height = 7)
+gridExtra::grid.arrange(nares.p, recount.p, ncol = 2)
+dev.off()
+```
