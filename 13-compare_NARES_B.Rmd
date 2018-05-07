@@ -104,13 +104,10 @@ recount.indx <- grep("recount", rownames(cor.z.mat))
 # pertinent indices
 impt.cor.z.mat <- cor.z.mat[recount.indx, nares.indx] 
 
-# melt
-impt.cor.df <- reshape2::melt(impt.cor.z.mat, 
-                              varnames = c("recount_LV", "NARES_LV"))
-colnames(impt.cor.df)[3] <- "pearson_Z"
-
 # for each NARES model LV, want the highest correlated LV from recount
-mapping.df <- impt.cor.df %>%
+mapping.df <- reshape2::melt(impt.cor.z.mat, 
+                              varnames = c("recount_LV", "NARES_LV"),
+                              value.name = "pearson_Z") %>%
                 dplyr::group_by(NARES_LV) %>%
                 dplyr::top_n(1, pearson_Z)
 
@@ -155,8 +152,8 @@ rownames(recount.nares.b) <- paste0("recountLV", 1:nrow(recount.nares.b))
 cor.b.mat <- cor(t(recount.nares.b), t(nares.b))
 
 # melt
-cor.b.df <- reshape2::melt(cor.b.mat, varnames = c("recount_LV", "NARES_LV"))
-colnames(cor.b.df)[3] <- "pearson_B"
+cor.b.df <- reshape2::melt(cor.b.mat, varnames = c("recount_LV", "NARES_LV"),
+                           value.name = "pearson_B")
 
 mapping.df <- dplyr::inner_join(mapping.df, cor.b.df, 
                                 by = c("recount_LV" = "recount_LV", 
