@@ -96,8 +96,8 @@ recount.b <- readRDS(file = recount.b.file)
 ```{r}
 mcp.results <- 
   MCPcounter::MCPcounter.estimate(exprs.mat, featuresType = "HUGO_symbols")
-mcp.melt <- reshape2::melt(mcp.results)
-colnames(mcp.melt) <- c("Cell_type", "Sample", "MCP_estimate")
+mcp.melt <- reshape2::melt(mcp.results, varnames = c("Cell_type", "Sample"),
+                           value.name = "MCP_estimate")
 readr::write_tsv(mcp.melt, 
                  file.path(results.dir, 
                            "NARES_ComBat_MCPCounter_results_tidy.tsv"))
@@ -116,7 +116,7 @@ These are the LVs we'll compare to the MCPcounter estimates.
 
 ```{r}
 # tidy neutrophil-associated LVs
-neutro.lv.df <- as.data.frame(nares.b[3 ,])
+neutro.lv.df <- as.data.frame(nares.b["3,IRIS_Neutrophil-Resting", ])
 neutro.lv.df <- tibble::rownames_to_column(neutro.lv.df)
 colnames(neutro.lv.df) <- c("Sample", "NARES_LV3")
 recount.lv.df <- as.data.frame(recount.b["603,SVM Neutrophils", ])
@@ -154,7 +154,7 @@ nares.p <- neutro.df %>%
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
                  text = ggplot2::element_text(size = 15)) +
   ggplot2::annotate(geom = "text", x = -0.1, y = 2.25, 
-                    label = "r-squared = 0.98")
+                    label = "r-squared = 0.98", size = 5)
 nares.p
 ```
 
@@ -174,7 +174,7 @@ recount.p <- neutro.df %>%
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
                  text = ggplot2::element_text(size = 15)) +
   ggplot2::annotate(geom = "text", x = -0.1, y = 2.5, 
-                    label = "r-squared = 0.90")
+                    label = "r-squared = 0.90", size = 5)
 recount.p
 ```
 
