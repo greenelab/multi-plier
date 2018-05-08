@@ -97,21 +97,21 @@ cor.z.mat <- cor(z.matrix, method = "pearson")
 # set diagonal to 0 to help find max correlation between LVs
 diag(cor.z.mat) <- 0
 
-# for the NARES LVs, what recount2 LVs are they most correlated with (max)?
-nares.max.cor.lv <- apply(cor.z.mat[1:(ncol(recount.z) - 1), 
-                                 ncol(recount.z):ncol(cor.z.mat)], 
-                          2, which.max)
+# indices for each model
+nares.indx <- grep("nares", rownames(cor.z.mat))
+recount.indx <- grep("recount", rownames(cor.z.mat))
 
-# correlation values themselves
-nares.max.cor <- apply(cor.z.mat[1:(ncol(recount.z) - 1), 
-                                 ncol(recount.z):ncol(cor.z.mat)], 
-                       2, max)
+# pertinent indices
+impt.cor.z.mat <- cor.z.mat[recount.indx, nares.indx] 
 
-# bind LV names together
-mapping.df <- as.data.frame(cbind(names(nares.max.cor.lv), 
-                                  colnames(cor.z.mat)[nares.max.cor.lv],
-                                  nares.max.cor))
-colnames(mapping.df) <- c("NARES_LV", "recount_LV", "pearson_Z")
+# for each NARES model LV, want the highest correlated LV from recount
+mapping.df <- reshape2::melt(impt.cor.z.mat, 
+                              varnames = c("recount_LV", "NARES_LV"),
+                              value.name = "pearson_Z") %>%
+                dplyr::group_by(NARES_LV) %>%
+                dplyr::top_n(1, pearson_Z)
+
+mapping.df
 ```
 
 ## NARES data in recount2 latent space
@@ -126,10 +126,6 @@ exprs.df <- data.table::fread(exprs.file, data.table = FALSE)
 exprs.mat <- dplyr::select(exprs.df, -(EntrezID:GeneSymbol))
 rownames(exprs.mat) <- exprs.df$GeneSymbol
 rm(exprs.df)
-```
-
-```{r}
-head(rownames(exprs.mat))
 ```
 
 ```{r}
@@ -149,25 +145,19 @@ saveRDS(recount.nares.b, file = recount.b.file)
 # get the NARES B matrices from both models, relabel the latent variables to
 # indicate which model they are from
 nares.b <- nares.plier$B
-rownames(nares.b) <- paste("NARES", rownames(nares.b))
-rownames(recount.nares.b) <- paste("recount", rownames(recount.nares.b))
+rownames(nares.b) <- paste0("naresLV", 1:nrow(nares.b))
+rownames(recount.nares.b) <- paste0("recountLV", 1:nrow(recount.nares.b))
 
 # correlation
-cor.b.mat <- cor(t(nares.b), t(recount.nares.b))
+cor.b.mat <- cor(t(recount.nares.b), t(nares.b))
 
-# add the LV (B) values to mapping data.frame
-mapping.df$pearson_B <- rep(NA, nrow(mapping.df))
-for (row.iter in 1:nrow(mapping.df)) {
-  recount.index <- as.integer(gsub("recountLV", "", 
-                                   mapping.df$recount_LV[row.iter]))
-  mapping.df[row.iter, "pearson_B"] <- cor.b.mat[row.iter, recount.index]
-}
-rownames(mapping.df) <- NULL
-```
+# melt
+cor.b.df <- reshape2::melt(cor.b.mat, varnames = c("recount_LV", "NARES_LV"),
+                           value.name = "pearson_B")
 
-```{r}
-mapping.df <- mapping.df %>%
-                dplyr::mutate(pearson_Z = as.numeric(as.character(pearson_Z)))
+mapping.df <- dplyr::inner_join(mapping.df, cor.b.df, 
+                                by = c("recount_LV" = "recount_LV", 
+                                       "NARES_LV" = "NARES_LV"))
 mapping.df
 ```
 
@@ -209,7 +199,7 @@ gplots::heatmap.2(cor.map.mat,
                   RowSideColors = row.color.bar)
 legend("topright", 
        legend = c("significant"),
-       col = c("#0000FF"), cex = 0.5,
+       col = c("#0000FF"), cex = 0.75,
        lty = 1, lwd = 6)
 ```
 
@@ -225,7 +215,7 @@ gplots::heatmap.2(cor.map.mat,
                   RowSideColors = row.color.bar)
 legend("topright", 
        legend = c("significant"),
-       col = c("#0000FF"), cex = 0.5,
+       col = c("#0000FF"), cex = 0.75,
        lty = 1, lwd = 6)
 dev.off()
 ```
@@ -237,43 +227,39 @@ It's possible that the correlation of `B` between the "best match" (as
 determined by `Z` matrix correlation) LVs is not particularly notable.
 
 ```{r}
-# tidy things up for plotting
-b.cor.df <- reshape2::melt(cor.b.mat)
-head(b.cor.df)
-```
-
-```{r}
-colnames(b.cor.df) <- c("NARES_LV", "recount_LV", "Correlation")
-b.cor.df$LV_type <- rep("all", nrow(b.cor.df))
+# add LV type information
+cor.b.df$LV_type <- rep("all", nrow(cor.b.df))
 ```
 
 ```{r}
 # add best match information
 best.match.df <- dplyr::select(mapping.df, -pearson_Z) %>%
                   dplyr::mutate(LV_type = "best match")
-colnames(best.match.df)[3] <- "Correlation"
-b.cor.df <- dplyr::bind_rows(b.cor.df, best.match.df) 
-```
 
-```{r}
 # we'll add points for the significant lvs in blue
-sig.pts <- best.match.df$Correlation[sig.lvs]
-```
+best.match.df$Significance <- NA
+best.match.df$Significance[sig.lvs] <- "Significant"
 
+b.cor.df <- dplyr::bind_rows(cor.b.df, best.match.df) 
+```
 
 ```{r}
 b.cor.df %>%
-  ggplot2::ggplot(ggplot2::aes(x = Correlation,
+  ggplot2::ggplot(ggplot2::aes(x = pearson_B,
                                group = LV_type,
                                fill = LV_type)) +
   ggplot2::geom_density(alpha = 0.3) +
   ggplot2::scale_fill_manual(values = c("#FFFFFF", "#5E5E5E")) +
   ggplot2::theme_bw() +
-  ggplot2::annotate("point", x = sig.pts, y = rep(0, length(sig.lvs)),
-                    shape = 15, size = 3, colour = "#0000FF", alpha = 0.6) +
+  ggplot2::geom_point(ggplot2::aes(y = 0, colour = Significance),
+                      shape = 15, size = 3, alpha = 0.7) +
   ggplot2::labs(title = "Correlation NARES B matrices",
-                subtitle = "NARES v. recount2 PLIER models") +
-  ggplot2::theme(text = ggplot2::element_text(size = 15))
+                subtitle = "NARES v. recount2 PLIER models",
+                x = "Correlation") +
+  ggplot2::theme(text = ggplot2::element_text(size = 15)) +
+  ggplot2::scale_colour_manual(breaks = "Significant", values = c("#0000FF")) +
+  ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(shape = NA),
+                                               title = "LV Type"))
 ```
 
 ```{r}

@@ -142,8 +142,7 @@ PLIER::plotU(nares.plier, fontsize_row = 8, fontsize_col = 8)
 dev.off()
 ```
 
-#### What proportion of the pathways input into the PLIER model are 
-significantly associated with at least one LV?
+#### What proportion of the pathways input into the PLIER model are significantly associated with at least one LV?
 
 ```{r}
 coverage.results <- GetPathwayCoverage(nares.plier)  # FDR < 0.05 by default
@@ -164,7 +163,8 @@ ggplot2::ggplot(as.data.frame(u.sparsity.all),
   ggplot2::geom_density(fill = "blue", alpha = 0.5) +
   ggplot2::theme_bw() +
   ggplot2::labs(x = "proportion of positive entries in U",
-                title = "All LVs")
+                title = "All LVs") +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
 ```
 
 ```{r}
@@ -187,7 +187,8 @@ ggplot2::ggplot(as.data.frame(u.sparsity.sig),
   ggplot2::geom_density(fill = "blue", alpha = 0.5) +
   ggplot2::theme_bw() +
   ggplot2::labs(x = "proportion of positive entries in U",
-                title = "Pathway-associated LVs")
+                title = "Pathway-associated LVs")  +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
 ```
 
 ```{r}
