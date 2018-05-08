@@ -1,0 +1,296 @@
+---
+title: "NARES v. recount2 LV comparsion"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+Our goal is to map LVs between different PLIER models based on the gene loadings
+(Z matrix). 
+The rationale is that LVs with the _most similar_ gene loadings map to each 
+other.
+In reality, a clear one-to-one mapping may not exist.
+Here, we're looking the NARES PLIER model and the recount2 PLIER model.
+
+We'd like to examine whether or not this transfer learning approach (e.g., 
+using the recount2 PLIER model with the NARES data) is likely to give us very
+different LV (B matrix) values. 
+If we get very different values, that should give us pause about using the
+transfer learning approach (e.g., multi-PLIER). 
+We're particularly concerned with LVs we consider to be "interpretable", i.e.,
+they have some non-random association with a pathway.
+For instance, do the trends we see in the "Neutrophil LV" from the NARES model 
+hold true in the "Neutrophil" LV from the recount2 model?
+
+## Functions and directory setup
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+```
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "13")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "13")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Load PLIER models, `Z` matrices
+
+### NARES PLIER
+
+```{r}
+# Load NARES PLIER model
+nares.plier.file <- file.path("results", "12", "NARES_PLIER_model.RDS")
+nares.plier <- readRDS(nares.plier.file)
+nares.summary <- nares.plier$summary
+```
+
+### recount2 PLIER
+
+```{r}
+# recount2 model
+# load recount2 PLIER model, rename
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+### `Z` matrices
+
+```{r}
+# get Z matrices from both models
+recount.z <- as.data.frame(recount.plier$Z)
+nares.z <- as.data.frame(nares.plier$Z)
+
+# we'll need to add the gene identifiers (symbols in this case) to a column
+# rather than as rownames -- this will facilitate joining
+recount.z <- tibble::rownames_to_column(recount.z, var = "Gene")
+colnames(recount.z)[2:ncol(recount.z)] <- paste0("recountLV", 
+                                                 1:(ncol(recount.z) - 1))
+nares.z <- tibble::rownames_to_column(nares.z, var = "Gene")
+colnames(nares.z)[2:ncol(nares.z)] <- paste0("naresLV", 
+                                                 1:(ncol(nares.z) - 1))
+
+# join -- only genes present in both models
+z.df <- dplyr::inner_join(recount.z, nares.z, by = "Gene")
+
+# need matrix to calculate correlation
+z.matrix <- as.matrix(z.df[, 2:ncol(z.df)])
+rownames(z.matrix) <- z.df$Gene
+```
+
+```{r}
+head(z.df)
+```
+
+## Calculate correlation between the `Z` matrices
+
+```{r}
+# calculate pearson correlation between LVs -- can we map between models using
+# this distance metric?
+cor.z.mat <- cor(z.matrix, method = "pearson")
+
+# set diagonal to 0 to help find max correlation between LVs
+diag(cor.z.mat) <- 0
+
+# indices for each model
+nares.indx <- grep("nares", rownames(cor.z.mat))
+recount.indx <- grep("recount", rownames(cor.z.mat))
+
+# pertinent indices
+impt.cor.z.mat <- cor.z.mat[recount.indx, nares.indx] 
+
+# for each NARES model LV, want the highest correlated LV from recount
+mapping.df <- reshape2::melt(impt.cor.z.mat, 
+                              varnames = c("recount_LV", "NARES_LV"),
+                              value.name = "pearson_Z") %>%
+                dplyr::group_by(NARES_LV) %>%
+                dplyr::top_n(1, pearson_Z)
+
+mapping.df
+```
+
+## NARES data in recount2 latent space
+
+We'll need to calculate this to compare `B` matrices.
+
+```{r}
+# get NARES expression matrix
+exprs.file <- file.path("data", "expression_data", 
+                        "NARES_SCANfast_ComBat_with_GeneSymbol.pcl")
+exprs.df <- data.table::fread(exprs.file, data.table = FALSE)
+exprs.mat <- dplyr::select(exprs.df, -(EntrezID:GeneSymbol))
+rownames(exprs.mat) <- exprs.df$GeneSymbol
+rm(exprs.df)
+```
+
+```{r}
+recount.nares.b <- GetNewDataB(exprs.mat = as.matrix(exprs.mat),
+                               plier.model = recount.plier)
+```
+
+```{r}
+# save to file
+recount.b.file <- file.path(results.dir, "NARES_recount2_B.RDS")
+saveRDS(recount.nares.b, file = recount.b.file)
+```
+
+## Compare `B` matrices
+
+```{r}
+# get the NARES B matrices from both models, relabel the latent variables to
+# indicate which model they are from
+nares.b <- nares.plier$B
+rownames(nares.b) <- paste0("naresLV", 1:nrow(nares.b))
+rownames(recount.nares.b) <- paste0("recountLV", 1:nrow(recount.nares.b))
+
+# correlation
+cor.b.mat <- cor(t(recount.nares.b), t(nares.b))
+
+# melt
+cor.b.df <- reshape2::melt(cor.b.mat, varnames = c("recount_LV", "NARES_LV"),
+                           value.name = "pearson_B")
+
+mapping.df <- dplyr::inner_join(mapping.df, cor.b.df, 
+                                by = c("recount_LV" = "recount_LV", 
+                                       "NARES_LV" = "NARES_LV"))
+mapping.df
+```
+
+## Plotting results
+
+First, let's identify which of the NARES LVs are significantly associated with
+pathways. 
+We'll want to highlight these in our plots, as we expect that these are
+most likely to be "preserved" between models because they are related to
+the input gene sets (which were constant between models).
+
+```{r}
+sig.summary <- nares.summary %>%
+                dplyr::filter(FDR < 0.05)
+sig.summary
+```
+
+```{r}
+sig.lvs <- as.integer(unique(sig.summary$`LV index`))
+```
+
+### Heatmap of correlation values
+
+```{r}
+# annotation bar indicating significant association with a pathway
+row.color.bar <- rep("#FFFFFF", nrow(mapping.df))
+row.color.bar[sig.lvs] <- "#0000FF"
+```
+
+```{r}
+cor.map.mat <- as.matrix(mapping.df[, c("pearson_Z", "pearson_B")])
+rownames(cor.map.mat) <- mapping.df$NARES_LV
+gplots::heatmap.2(cor.map.mat,
+                  Rowv = NA, Colv = NA, trace = "none", dendrogram = "none",
+                  col = colorRampPalette(colors = c("#FFFFFF", "#FF0000")),
+                  cellnote = round(x = cor.map.mat, 2), notecol = "#000000",
+                  notecex = 0.5, margins = c(5, 9),
+                  cexCol = 0.75, cexRow = 0.7,
+                  RowSideColors = row.color.bar)
+legend("topright", 
+       legend = c("significant"),
+       col = c("#0000FF"), cex = 0.75,
+       lty = 1, lwd = 6)
+```
+
+```{r}
+# save plot to file
+pdf(file.path(plot.dir, "NARES_Z_B_correlation_heatmap.pdf"))
+gplots::heatmap.2(cor.map.mat,
+                  Rowv = NA, Colv = NA, trace = "none", dendrogram = "none",
+                  col = colorRampPalette(colors = c("#FFFFFF", "#FF0000")),
+                  cellnote = round(x = cor.map.mat, 2), notecol = "#000000",
+                  notecex = 0.6, margins = c(5, 9),
+                  cexCol = 0.75, cexRow = 0.7,
+                  RowSideColors = row.color.bar)
+legend("topright", 
+       legend = c("significant"),
+       col = c("#0000FF"), cex = 0.75,
+       lty = 1, lwd = 6)
+dev.off()
+```
+
+### Density plots
+
+Let's look at the entire distribution of `cor.b.mat`. 
+It's possible that the correlation of `B` between the "best match" (as 
+determined by `Z` matrix correlation) LVs is not particularly notable.
+
+```{r}
+# add LV type information
+cor.b.df$LV_type <- rep("all", nrow(cor.b.df))
+```
+
+```{r}
+# add best match information
+best.match.df <- dplyr::select(mapping.df, -pearson_Z) %>%
+                  dplyr::mutate(LV_type = "best match")
+
+# we'll add points for the significant lvs in blue
+best.match.df$Significance <- NA
+best.match.df$Significance[sig.lvs] <- "Significant"
+
+b.cor.df <- dplyr::bind_rows(cor.b.df, best.match.df) 
+```
+
+```{r}
+b.cor.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = pearson_B,
+                               group = LV_type,
+                               fill = LV_type)) +
+  ggplot2::geom_density(alpha = 0.3) +
+  ggplot2::scale_fill_manual(values = c("#FFFFFF", "#5E5E5E")) +
+  ggplot2::theme_bw() +
+  ggplot2::geom_point(ggplot2::aes(y = 0, colour = Significance),
+                      shape = 15, size = 3, alpha = 0.7) +
+  ggplot2::labs(title = "Correlation NARES B matrices",
+                subtitle = "NARES v. recount2 PLIER models",
+                x = "Correlation") +
+  ggplot2::theme(text = ggplot2::element_text(size = 15)) +
+  ggplot2::scale_colour_manual(breaks = "Significant", values = c("#0000FF")) +
+  ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(shape = NA),
+                                               title = "LV Type"))
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "NARES_B_correlation_density.pdf")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+## Summary
+
+Some ambiguity in mapping latent variables across models suggests that the
+transfer learning using a model trained on gene expression data from diverse
+biological conditions (e.g., recount2 data)
+could be valuable for meta-analyses where curating a large enough compendium 
+specific to one's biological domain of interest is infeasible
+(e.g., in ANCA-associated vasculitis).
+
+This analysis suggests that LVs that can be mapped across models (e.g., 
+"best match") have reasonably correlated sample values, much more so than 
+random pairs of LVs. 
+Pathway-associated LVs are particularly well-correlated.
+
+The neutrophil (`NARES LV3`) and ECM (`NARES LV14`) LVs results from the NARES
+model suggests that these are among the strongest signals in this expression 
+data (and this makes a lot of biological sense given the study at hand). 
+These LVs had correlation values > `0.9` with their best matches in the
+recount2 PLIER model.
+
+`NARES LV2` values have no association with their best match in the recount2 
+model. 
+The gene sets significantly associated with `NARES LV2` are macrophage,
+dendritic cell, and mast cell gene sets. 
+This is a broad swath of the myeloid lineage, and may suggest that the lack of
+specificity contributes to the poor correlation.
+
