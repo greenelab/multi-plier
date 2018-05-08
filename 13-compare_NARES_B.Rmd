@@ -199,7 +199,7 @@ gplots::heatmap.2(cor.map.mat,
                   RowSideColors = row.color.bar)
 legend("topright", 
        legend = c("significant"),
-       col = c("#0000FF"), cex = 0.5,
+       col = c("#0000FF"), cex = 0.75,
        lty = 1, lwd = 6)
 ```
 
@@ -215,7 +215,7 @@ gplots::heatmap.2(cor.map.mat,
                   RowSideColors = row.color.bar)
 legend("topright", 
        legend = c("significant"),
-       col = c("#0000FF"), cex = 0.5,
+       col = c("#0000FF"), cex = 0.75,
        lty = 1, lwd = 6)
 dev.off()
 ```
@@ -235,14 +235,13 @@ cor.b.df$LV_type <- rep("all", nrow(cor.b.df))
 # add best match information
 best.match.df <- dplyr::select(mapping.df, -pearson_Z) %>%
                   dplyr::mutate(LV_type = "best match")
+
+# we'll add points for the significant lvs in blue
+best.match.df$Significance <- NA
+best.match.df$Significance[sig.lvs] <- "Significant"
+
 b.cor.df <- dplyr::bind_rows(cor.b.df, best.match.df) 
 ```
-
-```{r}
-# we'll add points for the significant lvs in blue
-sig.pts <- best.match.df$pearson_B[sig.lvs]
-```
-
 
 ```{r}
 b.cor.df %>%
@@ -252,12 +251,15 @@ b.cor.df %>%
   ggplot2::geom_density(alpha = 0.3) +
   ggplot2::scale_fill_manual(values = c("#FFFFFF", "#5E5E5E")) +
   ggplot2::theme_bw() +
-  ggplot2::annotate("point", x = sig.pts, y = rep(0, length(sig.lvs)),
-                    shape = 15, size = 3, colour = "#0000FF", alpha = 0.6) +
+  ggplot2::geom_point(ggplot2::aes(y = 0, colour = Significance),
+                      shape = 15, size = 3, alpha = 0.7) +
   ggplot2::labs(title = "Correlation NARES B matrices",
                 subtitle = "NARES v. recount2 PLIER models",
                 x = "Correlation") +
-  ggplot2::theme(text = ggplot2::element_text(size = 15))
+  ggplot2::theme(text = ggplot2::element_text(size = 15)) +
+  ggplot2::scale_colour_manual(breaks = "Significant", values = c("#0000FF")) +
+  ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(shape = NA),
+                                               title = "LV Type"))
 ```
 
 ```{r}
