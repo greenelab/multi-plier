@@ -131,9 +131,8 @@ head(neutro.lv.df)
 
 ```{r}
 # join with MCPcounter neutrophil estimates
-neutro.df <- 
-  dplyr::inner_join(x = dplyr::filter(mcp.melt, Cell_type == "Neutrophils"),
-                    y = neutro.lv.df, by = "Sample")
+neutro.df <- dplyr::filter(mcp.melt, Cell_type == "Neutrophils") %>%
+                dplyr::inner_join(y = neutro.lv.df, by = "Sample")
 ```
 
 ### Plotting
