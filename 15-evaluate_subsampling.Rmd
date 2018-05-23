@@ -1,0 +1,125 @@
+---
+title: "Evaluating the recount2 subsampled models"
+output: html_notebook
+---
+
+**J. Taroni 2018**
+
+In `11-subsample_recount_PLIER.R`, we subsampled the recount2 dataset such that
+it contained the same number of samples as the SLE WB compendium (`n = 1640`) 
+ten times. 
+We trained a PLIER model on each of the ten randomly selected datasets. 
+
+Here, we'll evaluate the ten models in the following ways:
+
+* Sparsity of `U` (prior information coefficient matrix; proxy for "ease 
+of interpretation")
+* Number of latent variables
+* Pathway coverage (e.g., what percentage of pathways are associated with an 
+LV, how many LVs have a pathway significantly associated with them)
+
+## Functions and directory set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "15")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "15")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+### Functions specifically for this evaluation
+
+```{r}
+EvalWrapper <- function(plier.model){
+  # wrapper function for evaluation of subsampled PLIER models, takes a 
+  # PLIER model (output of PLIER::PLIER, typically via the custom function 
+  # PLIERNewData) and outputs the following metrics: 1) U sparsity (all LVs) 
+  # 2) U sparsity (only significant LVs taken into account) 3) pathway coverage
+  # metrics 4) number of LVs
+  #
+  # Args:
+  #   plier.model: output of PLIER::PLIER, typically via the custom function 
+  #                PLIERNewData
+  #
+  # Returns:
+  #   A list with the following elements 1) all.sparsity 2) sig.sparsity 
+  #   3) pathway.coverage 4) num.lvs -- see above'
+  
+  # Initialize list
+  return.list <- list()
+  # U sparsity
+  return.list$all.sparsity <- CalculateUSparsity(plier.model)
+  return.list$sig.sparsity <- CalculateUSparsity(plier.model, 
+                                                 significant.only = TRUE,
+                                                 fdr.cutoff = 0.05)
+  # pathway coverage metrics (3 of them)
+  return.list$pathway.coverage <- GetPathwayCoverage(plier.model, 
+                                                     fdr.cutoff = 0.05)
+  # number of latent variables
+  return.list$num.lvs <- nrow(plier.model$B)
+
+  return(return.list)
+  
+}
+```
+
+## Main evaluation
+
+```{r}
+# directory where the models RDS were saved
+subsampled.dir <- file.path("results", "11")
+
+# list files in the directory -- we'll us lapply to generate a list of list
+plier.files <- list.files(subsampled.dir, full.names = TRUE)
+```
+
+```{r}
+# read in models -- each of the files contains a list where PLIER corresponds
+# to the PLIER model
+model.list <- lapply(plier.files, function(x) readRDS(x)$PLIER)
+names(model.list) <- sub(".RDS", "", sub(".*\\/", "", plier.files))
+# evaluate models with wrapper function 
+eval.list <- lapply(model.list, EvalWrapper)
+```
+
+```{r}
+# reshape list to data.frame for wrangling
+eval.df <- reshape2::melt(eval.list)
+colnames(eval.df) <- c("value", "pathway_coverage_type", "metric", "model")
+
+# U sparsity -- we'll keep all and significant only in the same data.frame
+sparsity.df <- eval.df %>%
+                dplyr::filter(metric %in% c("all.sparsity", "sig.sparsity")) %>%
+                dplyr::mutate(sparsity_type = metric) %>%
+                dplyr::select(c(model, sparsity_type, value))
+
+# number of lvs
+num.lvs.df <- eval.df %>%
+                dplyr::filter(metric == "num.lvs") %>%
+                dplyr::mutate(num_lvs = value) %>%
+                dplyr::select(c(model, num_lvs))
+
+# pathway coverage
+pathway.df <- eval.df %>%
+                dplyr::filter(metric == "pathway.coverage") %>% 
+                dplyr::select(c(model, pathway_coverage_type, value))
+```
+
+```{r}
+# write to file
+sparsity.file <- file.path(results.dir, "subsampled_sparsity.tsv")
+readr::write_tsv(sparsity.df, sparsity.file)
+
+num.file <- file.path(results.dir, "subsampled_num_lvs.tsv")
+readr::write_tsv(num.lvs.df, num.file)
+
+pathway.file <- file.path(results.dir, "subsampled_pathway.tsv")
+readr::write_tsv(pathway.df, pathway.file)
+```
+
