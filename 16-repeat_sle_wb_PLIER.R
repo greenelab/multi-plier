@@ -1,6 +1,7 @@
 # J. Taroni 2018
 # Train PLIER models on SLE WB compendium with 10 random seeds. This will
 # facilitate comparison with the subsampled recount2 data.
+# This takes 1-2 hours on a desktop w/ 64GB ram, quad core.
 #
 # USAGE: Rscript 16-repeat_sle_wb_PLIER.R
 
