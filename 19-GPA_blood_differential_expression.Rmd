@@ -238,5 +238,3 @@ BoxplotDiffLV(tidy.b.df = pbmc.b.df,
               phenotype.column = "GPA_signature",
               pdf.path = boxplot.file)
 ```
-
-
