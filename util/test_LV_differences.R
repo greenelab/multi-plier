@@ -130,3 +130,34 @@ BoxplotDiffLV <- function(tidy.b.df, phenotype.column, pdf.path) {
   }
   dev.off()
 }
+
+PrepExpressionDF <- function(exprs){
+  # Takes a data.frame where the first columns contains gene identifiers.
+  # Returns matrix of expression data, collapsed to gene level (mean), where
+  # the gene identifiers are rownames.
+  # 
+  # Args:
+  #   exprs: A data.frame of (normalized) gene expression data, where the
+  #          rows are genes and the samples are columns. The first column
+  #          should contain gene identifiers and have the column name "Gene".
+  #          
+  # Returns: 
+  #   exprs.agg: a data.frame of aggregated expression data
+  
+  # error handling
+  if (colnames(exprs)[1] != "Gene") {
+    stop("The first column name of exprs must be named 'Gene'.")
+  }
+  
+  `%>%` <- dplyr::`%>%` 
+  
+  # for duplicate gene identifiers, take the average
+  exprs.agg <- exprs %>%
+    dplyr::group_by(Gene) %>%
+    dplyr::summarise_all(dplyr::funs(mean(., na.rm = TRUE)))
+  
+  # return aggregated expression data.frame
+  return(exprs.agg)
+  
+}
+
