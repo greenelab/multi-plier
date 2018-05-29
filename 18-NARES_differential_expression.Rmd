@@ -1,0 +1,128 @@
+---
+title: "NARES differential expression"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+The NARES study ([Grayson, et al. _Arthritis Rheumatol_. 2015](https://dx.doi.org/10.1002/art.39185)) included three sets of patients
+with ANCA-associated vasculitis: those with active nasal disease, prior nasal
+disease, and those with no history of nasal disease.
+There is also a composite comparator group.
+
+Here, we'll test for PLIER LVs that are differentially expressed between groups.
+We'll focus on the multiPLIER LVs (e.g., the recount2 PLIER model), as 
+we have demonstrated the validity of this approach in prior analyses.
+
+## Functions and directory set up
+
+```{r}
+`%>%` <- dplyr::`%>%` 
+source(file.path("util", "test_LV_differences.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "18")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "18")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+### Clinical data
+
+```{r}
+nares.demo <- readr::read_tsv(file.path("data", "sample_info", 
+                                        "NARES_demographic_data.tsv")) %>%
+  dplyr::mutate(Classification = dplyr::recode(Classification, 
+                                               C1 = "Healthy",
+                                               C2 = "Sarcoidosis",
+                                               C3 = "Allergic Rhinitis",
+                                               C4 = "EGPA",
+                                               V1 = "GPA (no prior nasal disease)",
+                                               V2 = "GPA with prior nasal disease",
+                                               V3 = "GPA with active nasal disease"))
+```
+
+### recount2 LVs
+
+```{r}
+recount.b <- readRDS(file.path("results", "13", "NARES_recount2_B.RDS"))
+```
+
+## NARES differential latent variable expression (DLVE)
+
+We're going to compare the seven classification groups, which correspond to
+different disease labels (and were recoded above).
+
+```{r}
+# the custom function TestLVDifferences requires a named vector
+classification.vector <- as.factor(make.names(nares.demo$Classification))
+names(classification.vector) <- nares.demo$Sample
+```
+
+```{r}
+# the test for differential expression & write to file
+# this is using BH correction for multiple testing
+nares.limma.df <- TestLVDifferences(b.matrix = recount.b,
+                                    phenotype = classification.vector)
+dlve.file <- file.path(results.dir, "NARES_recount2_model_LV_limma_results.tsv")
+readr::write_tsv(nares.limma.df, path = dlve.file)
+```
+
+We'll make box plots comparing these as well. 
+
+```{r}
+# the box plot function requires a long format data.frame
+recount.b.df <- reshape2::melt(recount.b)
+colnames(recount.b.df) <- c("LV", "Sample", "Value")
+recount.b.df <- dplyr::inner_join(recount.b.df, nares.demo, by = "Sample")
+```
+
+```{r}
+BoxplotDiffLV(tidy.b.df = recount.b.df, phenotype.column = "Classification",
+              pdf.path = file.path(plot.dir, 
+                                   "NARES_recount2_model_LV_boxplots.pdf"))
+```
+
+### Example LV
+
+```{r}
+nares.limma.df %>% 
+  dplyr::filter(adj.P.Val < 0.05) %>% 
+  dplyr::arrange(adj.P.Val)
+```
+
+```{r}
+# read in recount2 summary data.frame
+summary.file <- file.path("results", "08", "recount2_PLIER_summary.tsv")
+recount.summary <- readr::read_tsv(summary.file)
+```
+
+Let's plot `LV96`, as it looks biologically interesting.
+First, does the _name_ agree with the recount2 PLIER summary?
+
+```{r}
+recount.summary %>%
+  dplyr::filter(`LV index` == 96)
+```
+
+Yes, `SVM NK cells activated` is significantly associated with `LV96`.
+
+```{r}
+recount.b.df %>%
+  dplyr::filter(LV == "96,SVM NK cells activated") %>%
+  ggplot2::ggplot(ggplot2::aes(x = Classification, y = Value)) +
+  ggplot2::geom_boxplot() +
+  ggplot2::geom_jitter(position = ggplot2::position_jitter(0.15)) + 
+  ggplot2::theme_bw() +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+                 plot.title = ggplot2::element_text(hjust = 0.5, face = "bold")) +
+  ggplot2::ggtitle("LV 96 SVM NK cells activated")
+```
+
