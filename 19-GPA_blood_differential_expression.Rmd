@@ -1,0 +1,242 @@
+---
+title: "GPA blood differential expression"
+output: html_notebook
+---
+
+**J. Taroni 2018**
+
+Here, we'll perform differential expression (of LV) analyses for the PBMC data 
+from Cheadle C, Berger AE, Andrade F, et al. 
+[Transcription of PR3 and Related Myelopoiesis Genes in Peripheral Blood Mononuclear Cells in Active Wegener’s Granulomatosis](https://dx.doi.org/10.1002/art.27398). 
+_Arthritis & Rheumatism_, 2010. doi: 10.1002/art.27398.
+
+We'll be comparing the healthy controls, the patients with a GPA signature 
+(GPA-positive) and the patients without a GPA signature (GPA-negative).
+We'll first need to project this data into the recount2 PLIER model latent space.
+
+## Functions and directory set up
+
+```{r}
+`%>%` <- dplyr::`%>%` 
+source(file.path("util", "test_LV_differences.R"))
+source(file.path("util", "plier_util.R"))
+
+PrepExpressionDF <- function(exprs){
+  # Takes a data.frame where the first columns contains gene identifiers.
+  # Returns matrix of expression data, collapsed to gene level (mean), where
+  # the gene identifiers are rownames.
+  # 
+  # Args:
+  #   exprs: A data.frame of (normalized) gene expression data, where the
+  #          rows are genes and the samples are columns. The first column
+  #          should contain gene identifiers and have the column name "Gene".
+  #          
+  # Returns: 
+  #   exprs.agg: a data.frame of aggregated expression data
+  
+  # error handling
+  if (colnames(exprs)[1] != "Gene") {
+    stop("The first column name of exprs must be named 'Gene'.")
+  }
+  
+  `%>%` <- dplyr::`%>%` 
+  
+  # for duplicate gene identifiers, take the average
+  exprs.agg <- exprs %>%
+    dplyr::group_by(Gene) %>%
+    dplyr::summarise_all(dplyr::funs(mean(., na.rm = TRUE)))
+  
+  # return aggregated expression data.frame
+  return(exprs.agg)
+  
+}
+
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "19")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "19")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+The GPA blood file is in the form of a GEO series matrix, which means the 
+sample metadata is in what are essentially comment fields at the beginning of 
+the file.
+Thus, some ugliness/wrangling will be necessary.
+
+### Expression data
+
+```{r}
+series.mat.file <- file.path("data", "expression_data", 
+                             "GSE18885_series_matrix.txt")
+
+# expression matrix
+gpa.ma.data <- 
+  readr::read_delim(series.mat.file, 
+                    delim = "\t", 
+                    comment = "!",
+                    col_names = TRUE, 
+                    skip = 1)
+
+# this information about GPL6140 was downloaded on 15 Sept 2017, and reportedly
+# last updated on 18 Jan 2013
+gpl.from.geo <- readr::read_tsv(file.path("data", "expression_data", 
+                                          "GPL6104-11576.txt"), comment = "#")
+
+# use the gene symbols from the GPL file -- PLIER uses gene symbols
+gpa.ma.annot <- gpl.from.geo %>%
+  dplyr::select(c(ID, ILMN_Gene)) %>%
+  dplyr::left_join(y = gpa.ma.data,
+                   by = c("ID" = "ID_REF"))
+colnames(gpa.ma.annot)[2] <- "Gene"
+```
+
+```{r}
+# are there any duplicates in the gene symbol column?
+sum(duplicated(gpa.ma.annot$Gene))
+```
+
+```{r}
+# aggregate & write to file
+agg.ma.df <- PrepExpressionDF(dplyr::select(gpa.ma.annot, -ID))
+readr::write_tsv(agg.ma.df,
+                 path = file.path("data", "expression_data",
+                                  "GSE18885_annotated_mean.pcl"))
+
+# get expression matrix
+exprs.mat <- as.matrix(dplyr::select(agg.ma.df, -Gene))
+rownames(exprs.mat) <- agg.ma.df$Gene
+```
+
+### Metadata
+
+As mentioned above, metadata is also extracted from the series matrix file.
+
+```{r}
+# get more information from the series matrix file
+# line 41 has the sample names
+conn <- file(series.mat.file)
+open(conn)
+smpl.name <- read.table(conn, skip = 41, nrow = 1)
+close(conn)
+
+# line 51 contains the WG signature status -- I'll call this GPA signature
+# GPA-positive, GPA-negative to be in line with the current disease name
+conn <- file(series.mat.file)
+open(conn)
+gpa.sig.status <- read.table(conn, skip = 51, nrow = 1)
+close(conn)
+
+# this is the GEO sample accession information
+conn <- file(series.mat.file)
+open(conn)
+gsm.info <- read.table(conn, skip = 77, nrow = 1)
+close(conn)
+
+# get those lines into data.frame format
+smpl.info.df <- as.data.frame(t(dplyr::bind_rows(gsm.info, 
+                                                 smpl.name, 
+                                                 gpa.sig.status))[-1, ])
+colnames(smpl.info.df) <- c("Sample", "Name", "GPA_signature")
+
+# remove 1 row data.frames read in from the series matrix
+rm(conn, gsm.info, smpl.name, gpa.sig.status)
+```
+
+```{r}
+# extract fraction ("cell type(s)") from sample names
+smpl.info.df <- smpl.info.df %>%
+                  dplyr::mutate(Cell_type = sub(".*\\ ", "", Name))
+
+# recode the GPA signature bit
+smpl.info.df <-
+  smpl.info.df %>%
+  dplyr::mutate(GPA_signature = dplyr::case_when(
+                  grepl("control", GPA_signature) ~ "Control", 
+                  grepl("WG Sig -", GPA_signature) ~ "GPAneg",
+                  grepl("WG Sig +", GPA_signature) ~ "GPApos"
+                ))
+
+# write to file
+readr::write_tsv(smpl.info.df, 
+                 path = file.path("data", "sample_info",
+                                  "GSE18885_sample_info.tsv"))
+```
+
+```{r}
+# remove data.frames that won't be needed
+rm(agg.ma.df, gpa.ma.annot, gpa.ma.data, gpl.from.geo)
+```
+
+## Apply recount2 model
+
+```{r}
+# load model itself
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+# project
+recount.b <- GetNewDataB(exprs.mat = as.matrix(exprs.mat),
+                         plier.model = recount.plier)
+```
+
+```{r}
+# save B matrix to file
+b.file <- file.path(results.dir, "GPA_blood_recount2_B.RDS")
+saveRDS(recount.b, file = b.file)
+```
+
+## Differential expression
+
+### PBMC only
+
+We're going to restrict our analyses to the peripheral blood mononuclear cell 
+(PBMC) fraction.
+
+```{r}
+# sample information
+pbmc.df <- smpl.info.df %>%
+  dplyr::filter(Cell_type == "PBMC")
+```
+
+```{r}
+# b matrix (latent variables)
+pbmc.b <- recount.b[, pbmc.df$Sample]
+```
+
+### Differential expression analysis itself
+
+```{r}
+# get the phenotype labels -- we'll use GPA signature status
+gpa.sig.vector <- pbmc.df$GPA_signature
+names(gpa.sig.vector) <- pbmc.df$Sample
+```
+
+```{r}
+# tests for differential expression
+limma.df <- TestLVDifferences(b.matrix = pbmc.b,
+                              phenotype = gpa.sig.vector)
+dlve.file <- file.path(results.dir, 
+                       "GPA_blood_recount2_model_LV_limma_results.tsv")
+readr::write_tsv(limma.df, path = dlve.file)
+```
+
+```{r}
+# plotting
+# first, long format
+pbmc.b.df <- reshape2::melt(pbmc.b)
+colnames(pbmc.b.df) <- c("LV", "Sample", "Value")
+# join with sample metadata
+pbmc.b.df <- dplyr::inner_join(pbmc.df, pbmc.b.df, by = "Sample")
+
+# box plots
+boxplot.file <- file.path(plot.dir, "GPA_blood_recount2_model_LV_boxplots.pdf")
+BoxplotDiffLV(tidy.b.df = pbmc.b.df,
+              phenotype.column = "GPA_signature",
+              pdf.path = boxplot.file)
+```
+
+
