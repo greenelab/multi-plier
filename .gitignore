@@ -40,3 +40,5 @@ data/sample_info/E-MTAB-2452.sdrf.txt
 data/sample_info/NARES_demographic_data.tsv
 data/sample_info/sle-wb_sample_dataset_mapping.tsv
 
+# private kidney data
+data/kidney/
