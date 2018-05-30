@@ -203,6 +203,8 @@ pbmc.b.df <- reshape2::melt(pbmc.b)
 colnames(pbmc.b.df) <- c("LV", "Sample", "Value")
 # join with sample metadata
 pbmc.b.df <- dplyr::inner_join(pbmc.df, pbmc.b.df, by = "Sample")
+tidy.file <- file.path(results.dir, "GPA_blood_recount2_B_tidy_PBMC_only.tsv")
+readr::write_tsv(pbmc.b.df, tidy.file)
 
 # box plots
 boxplot.file <- file.path(plot.dir, "GPA_blood_recount2_model_LV_boxplots.pdf")
