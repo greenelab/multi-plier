@@ -1,6 +1,9 @@
 ---
 title: "GPA blood differential expression"
-output: html_notebook
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
 ---
 
 **J. Taroni 2018**
