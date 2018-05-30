@@ -82,6 +82,8 @@ We'll make box plots comparing these as well.
 recount.b.df <- reshape2::melt(recount.b)
 colnames(recount.b.df) <- c("LV", "Sample", "Value")
 recount.b.df <- dplyr::inner_join(recount.b.df, nares.demo, by = "Sample")
+tidy.file <- file.path(results.dir, "NARES_recount2_B_tidy.tsv")
+readr::write_tsv(recount.b.df, tidy.file)
 ```
 
 ```{r}
