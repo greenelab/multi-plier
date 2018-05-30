@@ -161,7 +161,7 @@ specifically trained on this GPA blood data?
 
 ```{r}
 # remove objects we won't need for this next set of analyses
-rm(limma.df, recount.b.df, recount.plier, limma.file, plot.file, recount.b.file,
+rm(limma.df, recount.b.df, limma.file, plot.file, recount.b.file,
    top.z.df)
 ```
 
@@ -260,6 +260,68 @@ ggplot2::ggsave(plot.file,
                 width = 6, height = 8)
 ```
 
+`GPA blood LV 8` may be _most_ similar to another recount2 LV like 
+`recount2 LV 68`, which is also differentially expressed in this dataset.
+Let's take a quick look at the top 50 genes for `recount2 LV 68`.
+
+```{r}
+head(sort(recount.plier$Z[, 68], decreasing = TRUE), 50)
+```
+
+_By eye_, this looks more similar to `GPA blood LV 8`, but let's do a more
+formal analysis.
+
+### Compare to recount2 LVs
+
+```{r}
+# get Z matrices from both models
+recount.z <- as.data.frame(recount.plier$Z)
+gpa.z <- as.data.frame(gpa.plier$Z)
+
+# we'll need to add the gene identifiers (symbols in this case) to a column
+# rather than as rownames -- this will facilitate joining
+recount.z <- tibble::rownames_to_column(recount.z, var = "Gene")
+colnames(recount.z)[2:ncol(recount.z)] <- paste0("recountLV", 
+                                                 1:(ncol(recount.z) - 1))
+gpa.z <- tibble::rownames_to_column(gpa.z, var = "Gene")
+colnames(gpa.z)[2:ncol(gpa.z)] <- paste0("gpaLV", 1:(ncol(gpa.z) - 1))
+
+# join -- only genes present in both models
+z.df <- dplyr::inner_join(recount.z, gpa.z, by = "Gene")
+
+# need matrix to calculate correlation
+z.matrix <- as.matrix(z.df[, 2:ncol(z.df)])
+rownames(z.matrix) <- z.df$Gene
+```
+
+```{r}
+# calculate pearson correlation between LVs -- can we map between models using
+# this distance metric?
+cor.z.mat <- cor(z.matrix, method = "pearson")
+
+# set diagonal to 0 to help find max correlation between LVs
+diag(cor.z.mat) <- 0
+
+# indices for each model
+gpa.indx <- grep("gpa", rownames(cor.z.mat))
+recount.indx <- grep("recount", rownames(cor.z.mat))
+
+# pertinent indices
+impt.cor.z.mat <- cor.z.mat[recount.indx, gpa.indx] 
+
+# for each GPA blood model LV, want the highest correlated LV from recount
+mapping.df <- reshape2::melt(impt.cor.z.mat, 
+                              varnames = c("recount_LV", "GPA_blood_LV"),
+                              value.name = "pearson_Z") %>%
+                dplyr::group_by(GPA_blood_LV) %>%
+                dplyr::top_n(1, pearson_Z)
+
+mapping.df
+```
+
+It looks like `GPA blood LV 8` does in fact map to `recount2 LV 68` as 
+determined by taking the Pearson correlation between loadings.
+
 ## Summary
 
 Despite the lack of AAV expression data in the training compendium, the
@@ -270,4 +332,7 @@ and minor (e.g., _AZU1_, _BPI_) autoantigens in ANCA-associated vasculitis.
 
 We find an LV in the model specifically trained on the GPA blood dataset that
 also captures the activity autoantigens (`GPA blood LV 8`).
-However, the major autoantigens are not as highly ranked.
+However, the major autoantigens are not as highly ranked and this maps to 
+another LV in the recount2 model, `recount2 LV 68`.
+This suggests that the recount2 model (e.g., the multiPLIER approach) can 
+identify additional, highly relevant LVs.
