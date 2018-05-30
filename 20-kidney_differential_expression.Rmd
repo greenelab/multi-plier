@@ -127,6 +127,8 @@ colnames(recount.b.df) <- c("LV", "Sample", "Value")
 recount.b.df <- dplyr::inner_join(recount.b.df,
                                   diagnosis.df,
                                   by = c("Sample" = "Microarray Sample ID"))
+tidy.file <- file.path(results.dir, "ERCB_glom_recount2_B_tidy.tsv")
+readr::write_tsv(recount.b.df, tidy.file)
 ```
 
 ```{r}
