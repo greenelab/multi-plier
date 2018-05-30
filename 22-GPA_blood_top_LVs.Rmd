@@ -1,0 +1,273 @@
+---
+title: "Top differentially expressed LVs in GPA blood"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+Explore the top differentially expressed LVs in the GPA blood dataset (PBMCs).
+Are they pathways we could have captured with a PLIER model fit to this dataset?
+
+## Functions and directory setup
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "22")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "22")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Load DLVE results
+
+```{r}
+limma.file <- file.path("results", "19", 
+                        "GPA_blood_recount2_model_LV_limma_results.tsv")
+limma.df <- readr::read_tsv(limma.file)
+```
+
+Let's take a look at the top differentially expressed latent variables. 
+We'll sort by FDR.
+
+```{r}
+limma.df %>%
+  dplyr::filter(adj.P.Val < 0.05) %>%
+  dplyr::arrange(adj.P.Val)
+```
+
+Let's explore `LV 599` a little further.
+
+```{r}
+recount.b.file <- file.path("results", "19", 
+                            "GPA_blood_recount2_B_tidy_PBMC_only.tsv")
+recount.b.df <- readr::read_tsv(recount.b.file) %>%
+  dplyr::mutate(GPA_signature =
+                  dplyr::case_when(
+                    GPA_signature == "GPApos" ~ "GPA-positive",
+                    GPA_signature == "GPAneg" ~ "GPA-negative",
+                    TRUE ~ "Control"
+                  ))
+```
+
+```{r}
+recount.b.df %>%
+  dplyr::filter(LV == "599,DMAP_ERY2") %>%
+  ggplot2::ggplot(ggplot2::aes(x = GPA_signature, y = Value)) +
+  ggplot2::geom_boxplot() +
+  ggplot2::geom_jitter(position = ggplot2::position_jitter(0.2)) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "GPA signature", y = "LV 599",
+                title = "Cheadle, et al. top LV") +
+  ggplot2::theme(legend.position = "none",
+                 text = ggplot2::element_text(size = 15),
+                 plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"))
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "recount2_LV599_boxplot.pdf")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+## Load recount2 PLIER model
+
+```{r}
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+### What are the pathways associated with `LV 599`?
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 599)
+```
+
+### What genes contribute to this LV (e.g., have the highest loadings)? 
+
+Let's look at the top 50.
+
+```{r}
+head(sort(recount.plier$Z[, 599], decreasing = TRUE), 50)
+```
+
+Some of these are major or minor autoantigens in ANCA-associated vasculitis.
+This is consistent with the original publication 
+([Cheadle, et al. _A&R._ 2010.](https://dx.doi.org/10.1002/art.27398)): 
+the authors found that "neutrophil granule constituent genes" were highly 
+expressed in the PBMC fraction from patients with GPA that could not be 
+attributed to contamination with mature granulocytes.
+
+#### Plot highlighting autoantigens
+
+We'll use the list of autoantigens in Cheadle, et al.
+
+```{r}
+autoantigens <- c("MPO", "ELANE", "BPI", "CTSG", "LCN2", "AZU1", "PRTN3")
+```
+
+```{r}
+# get into appropriate data.frame for bar plot
+top.z.df <- as.data.frame(sort(recount.plier$Z[, 599],
+                               decreasing = TRUE)[1:50])
+top.z.df <- tibble::rownames_to_column(top.z.df, var = "Gene")
+colnames(top.z.df)[2] <- "Z"
+
+# add in autoantigen information
+top.z.df <- top.z.df %>%
+  dplyr::mutate(Autoantigen =
+                  dplyr::case_when(
+                    Gene %in% autoantigens ~ "Yes",
+                    TRUE ~ "No"
+                  ))
+
+# reorder for plotting
+top.z.df$Gene <- factor(top.z.df$Gene,
+                        levels = top.z.df$Gene[50:1])
+```
+
+```{r}
+ggplot2::ggplot(top.z.df, 
+                ggplot2::aes(x = Gene, y = Z, fill = Autoantigen)) +
+  ggplot2::geom_bar(stat = "identity") +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("black", "red")) +
+  ggplot2::coord_flip() +
+  ggplot2::ggtitle("recount2 LV 599 Loadings") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"))
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "recount2_LV599_top_Z_bar.pdf")
+ggplot2::ggsave(plot.file, 
+                plot = ggplot2::last_plot() + 
+                  ggplot2::theme(text = ggplot2::element_text(size = 15)), 
+                width = 6, height = 8)
+```
+
+## GPA Blood-specific PLIER model
+
+Would we have detected this "autoantigen signature" using a PLIER model
+specifically trained on this GPA blood data?
+
+```{r}
+# remove objects we won't need for this next set of analyses
+rm(limma.df, recount.b.df, recount.plier, limma.file, plot.file, recount.b.file,
+   top.z.df)
+```
+
+### Read in expression data
+
+```{r}
+exprs.file <- file.path("data", "expression_data", 
+                        "GSE18885_annotated_mean.pcl")
+agg.ma.df <- readr::read_tsv(exprs.file)
+# get expression matrix
+exprs.mat <- as.matrix(dplyr::select(agg.ma.df, -Gene))
+rownames(exprs.mat) <- agg.ma.df$Gene
+```
+
+### Train PLIER model
+
+```{r}
+gpa.plier <- PLIERNewData(exprs.mat)
+```
+
+```{r}
+plier.file <- file.path(results.dir, "GPA_blood_PLIER_model.RDS")
+saveRDS(gpa.plier, plier.file)
+```
+
+### Explore `U` matrix
+
+Taking a look at the `U` (prior information coefficient) matrix will tell us
+what kind of pathways were identified with this model.
+
+```{r}
+PLIER::plotU(gpa.plier, fontsize_row = 5, fontsize_col = 7)
+```
+
+```{r}
+pdf(file.path(plot.dir, "GPA_blood_U_plot.pdf"))
+PLIER::plotU(gpa.plier, fontsize_row = 6, fontsize_col = 7)
+dev.off()
+```
+
+`LV13` and `LV20` look like the most likely candidates, but we'll look across
+all 30 LVs.
+
+### Does an "autoantigen LV" exist in the GPA blood PLIER model?
+
+```{r}
+GetTopNGenes <- function(z.vector, num.genes = 50){
+  names(head(sort(z.vector, decreasing = TRUE), num.genes))
+}
+
+top.genes <- apply(gpa.plier$Z, 2, GetTopNGenes)
+ag.logical <- apply(top.genes, 2, function(x) any(x %in% autoantigens))
+which(ag.logical)
+```
+
+```{r}
+head(sort(gpa.plier$Z[, 8], decreasing = TRUE), 50)
+```
+
+```{r}
+# get into appropriate data.frame for bar plot
+top.z.df <- as.data.frame(sort(gpa.plier$Z[, 8],
+                               decreasing = TRUE)[1:50])
+top.z.df <- tibble::rownames_to_column(top.z.df, var = "Gene")
+colnames(top.z.df)[2] <- "Z"
+
+# add in autoantigen information
+top.z.df <- top.z.df %>%
+  dplyr::mutate(Autoantigen =
+                  dplyr::case_when(
+                    Gene %in% autoantigens ~ "Yes",
+                    TRUE ~ "No"
+                  ))
+
+# reorder for plotting
+top.z.df$Gene <- factor(top.z.df$Gene,
+                        levels = top.z.df$Gene[50:1])
+```
+
+```{r}
+ggplot2::ggplot(top.z.df, 
+                ggplot2::aes(x = Gene, y = Z, fill = Autoantigen)) +
+  ggplot2::geom_bar(stat = "identity") +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("black", "red")) +
+  ggplot2::coord_flip() +
+  ggplot2::ggtitle("GPA Blood LV 8 Loadings") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "GPA_blood_LV8_top_Z_bar.pdf")
+ggplot2::ggsave(plot.file, 
+                plot = ggplot2::last_plot() + 
+                  ggplot2::theme(text = ggplot2::element_text(size = 15)), 
+                width = 6, height = 8)
+```
+
+## Summary
+
+Despite the lack of AAV expression data in the training compendium, the
+recount2 PLIER model learns a latent variable highly relevant to AAV. 
+Specifically, `recount2 LV 599` captures a granulocyte progenitor signature.
+The top genes (as determined by the loadings, `Z`) are major (_PRTN3_, _MPO_) 
+and minor (e.g., _AZU1_, _BPI_) autoantigens in ANCA-associated vasculitis.
+
+We find an LV in the model specifically trained on the GPA blood dataset that
+also captures the activity autoantigens (`GPA blood LV 8`).
+However, the major autoantigens are not as highly ranked.
