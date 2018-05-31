@@ -1,0 +1,103 @@
+---
+title: "Compare differentially expressed LVs across AAV datasets"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+Here, we'll compare what latent variables are differentially expressed in each 
+of the ANCA-associated vasculitis data sets.
+An advantage of the multiPLIER approach is that we don't have to compare across 
+multiple models.
+We'll use a cutoff of `FDR < 0.05`. 
+Recall that we used "BH" correction for multiple testing in each case.
+
+At first, we'll take the naive approach of just looking at the overlapping
+sets of significant LVs.
+There's no guarantee that the directionality will be in agreement this way.
+
+## Install VennDiagram
+
+```{r}
+# current version on CRAN
+package.url <- "https://cran.r-project.org/src/contrib/VennDiagram_1.6.20.tar.gz"
+install.packages(package.url, repos = NULL, type = 'source')
+rm(package.url)
+```
+
+## Functions and directory set up
+
+```{r}
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "21")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "21")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+```{r}
+# files with all the limma results
+nares.file <- file.path("results", "18", 
+                        "NARES_recount2_model_LV_limma_results.tsv")
+blood.file <- file.path("results", "19", 
+                        "GPA_blood_recount2_model_LV_limma_results.tsv")
+kidney.file <- file.path("results", "20", 
+                         "ERCB_glom_recount2_model_LV_limma_results.tsv")
+```
+
+```{r}
+nares.df <- readr::read_tsv(nares.file)
+blood.df <- readr::read_tsv(blood.file)
+kidney.df <- readr::read_tsv(kidney.file)
+```
+
+## Identify significant LVs
+
+```{r}
+# initialize list to hold significant pathways for each of the datasets -- this
+# is what VennDiagram functions generally take as an argument
+sig.list <- list()
+sig.list[["nares"]] <- nares.df$LV[which(nares.df$adj.P.Val < 0.05)]
+sig.list[["blood"]] <- blood.df$LV[which(blood.df$adj.P.Val < 0.05)]
+sig.list[["kidney"]] <- kidney.df$LV[which(kidney.df$adj.P.Val < 0.05)]
+```
+
+## Overlap
+
+```{r}
+overlap <- VennDiagram::calculate.overlap(sig.list)
+overlap.file <- file.path(results.dir, "AAV_FDR_0.05_overlap.RDS")
+saveRDS(overlap, file = overlap.file)
+```
+
+### Venn Diagram
+
+```{r}
+vd.file <- file.path(plot.dir, "AAV_FDR_0.05_overlap.png")
+VennDiagram::venn.diagram(x = sig.list, filename = vd.file,
+                          imagetype = "png",
+                          resolution = 600,
+                          category.names = c("NARES", "GPA blood", 
+                                             "ERCB glomeruli"))
+```
+
+### What are the 22 LVs that are differentially expressed in all datasets/tissues?
+
+```{r}
+# which element of the overlap list are we looking for?
+lapply(overlap, length)
+```
+
+```{r}
+overlap$a5
+```

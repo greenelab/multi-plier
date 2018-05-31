@@ -1,0 +1,117 @@
+---
+title: "Kidney differential expression analysis"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In this notebook, we work with microdissected glomeruli data from patients with 
+nephrotic syndrome, patients with ANCA-associated vasculitis, and living donors.
+
+First, we'll apply the recount2 PLIER model and then we will test those LVs for
+differential expression between the three groups.
+
+## Functions and directory set up
+
+```{r}
+`%>%` <- dplyr::`%>%` 
+source(file.path("util", "test_LV_differences.R"))
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "20")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "20")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+### Expression data
+
+```{r}
+ercb.file <- file.path("data", "kidney", 
+                       "ERCB_Glom_CustCDF19_forVCRC.txt")
+exprs.df <- readr::read_tsv(ercb.file)
+exprs.df <- dplyr::select(exprs.df, -EntrezGeneID)
+colnames(exprs.df)[1] <- "Gene"
+```
+
+```{r}
+agg.exprs.df <- PrepExpressionDF(exprs.df)
+# any genes that don't have a gene symbol need to be dropped
+agg.exprs.df <- dplyr::filter(agg.exprs.df, !(is.na(Gene)))
+readr::write_tsv(agg.exprs.df, path = file.path("data", "kidney", 
+                                                "ERCB_Glom_mean_agg.pcl"))
+# as a matrix for use with PLIER
+exprs.mat <- as.matrix(dplyr::select(agg.exprs.df, -Gene))
+rownames(exprs.mat) <- agg.exprs.df$Gene
+```
+
+### Clinical data
+
+```{r}
+clinical.file <- file.path("data", "kidney", 
+                           "Neptune_ERCB_GE_Clinical_Data_2016-08-24_15-11-58-1.txt")
+clinical.df <- readr::read_tsv(clinical.file)
+```
+
+```{r}
+# only retain samples that are in the expression data
+microarray.samples <- colnames(exprs.mat)
+all(microarray.samples %in% clinical.df$`Microarray Sample ID`)
+```
+
+```{r}
+# we only want the info for the samples in the ERCB glomeruli data -- that's
+# the microarray data we're looking at
+clinical.df <- clinical.df %>% 
+                 dplyr::filter(`Microarray Sample ID` %in% microarray.samples,
+                               `Tissue Source` == "Glomeruli")
+
+# diagnosis information only - this will serve as group labels
+# recode diagnosis such that nephrotic syndrome diagnoses are grouped
+diagnosis.df <- clinical.df %>%
+  dplyr::select(c(`Microarray Sample ID`, Diagnosis)) %>%
+  dplyr::mutate(Diagnosis = 
+                  dplyr::recode(Diagnosis,
+                                MCD = "Nephrotic syndrome",
+                                MN = "Nephrotic syndrome",
+                                FSGS = "Nephrotic syndrome",
+                                `FSGS/MCD` = "Nephrotic syndrome"),
+                Sample = `Microarray Sample ID`) %>%
+  dplyr::select(c(Sample, Diagnosis))
+```
+
+## Apply recount2 model
+
+```{r}
+# load model itself
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+# project
+recount.b <- GetNewDataB(exprs.mat = as.matrix(exprs.mat),
+                         plier.model = recount.plier)
+```
+
+```{r}
+# save B matrix to file
+b.file <- file.path("data", "kidney", "ERCB_glom_recount2_B.RDS")
+saveRDS(recount.b, file = b.file)
+```
+
+## Differential expression
+
+```{r}
+LVTestWrapper(b.matrix = recount.b,
+              sample.info.df = diagnosis.df,
+              phenotype.col = "Diagnosis",
+              file.lead = "ERCB_glom_recount2_model",
+              plot.dir = plot.dir,
+              results.dir = results.dir)
+```
