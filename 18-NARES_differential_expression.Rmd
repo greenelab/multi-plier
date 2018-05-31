@@ -36,6 +36,10 @@ dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
 
 ### Clinical data
 
+This clinical data includes information like measures of disease severity 
+([`BVAS`](https://doi.org/10.1136/ard.2008.101279)) and disease duration.
+We're most interested in the disease labels (`Classification`).
+
 ```{r}
 nares.demo <- readr::read_tsv(file.path("data", "sample_info", 
                                         "NARES_demographic_data.tsv")) %>%
