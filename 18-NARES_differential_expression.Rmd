@@ -8,9 +8,10 @@ output:
 
 **J. Taroni 2018**
 
-The NARES study ([Grayson, et al. _Arthritis Rheumatol_. 2015](https://dx.doi.org/10.1002/art.39185)) included three sets of patients
-with ANCA-associated vasculitis: those with active nasal disease, prior nasal
-disease, and those with no history of nasal disease.
+The NARES study ([Grayson, et al. _Arthritis Rheumatol_. 2015](https://dx.doi.org/10.1002/art.39185)) 
+included three sets of patients with ANCA-associated vasculitis: those with 
+active nasal disease, prior nasal disease, and those with no history of nasal 
+disease.
 There is also a composite comparator group.
 
 Here, we'll test for PLIER LVs that are differentially expressed between groups.
@@ -35,6 +36,10 @@ dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
 ## Read in data
 
 ### Clinical data
+
+This clinical data includes information like measures of disease severity 
+([`BVAS`](https://doi.org/10.1136/ard.2008.101279)) and disease duration.
+We're most interested in the disease labels (`Classification`).
 
 ```{r}
 nares.demo <- readr::read_tsv(file.path("data", "sample_info", 
@@ -61,40 +66,18 @@ We're going to compare the seven classification groups, which correspond to
 different disease labels (and were recoded above).
 
 ```{r}
-# the custom function TestLVDifferences requires a named vector
-classification.vector <- as.factor(make.names(nares.demo$Classification))
-names(classification.vector) <- nares.demo$Sample
-```
-
-```{r}
-# the test for differential expression & write to file
-# this is using BH correction for multiple testing
-nares.limma.df <- TestLVDifferences(b.matrix = recount.b,
-                                    phenotype = classification.vector)
-dlve.file <- file.path(results.dir, "NARES_recount2_model_LV_limma_results.tsv")
-readr::write_tsv(nares.limma.df, path = dlve.file)
-```
-
-We'll make box plots comparing these as well. 
-
-```{r}
-# the box plot function requires a long format data.frame
-recount.b.df <- reshape2::melt(recount.b)
-colnames(recount.b.df) <- c("LV", "Sample", "Value")
-recount.b.df <- dplyr::inner_join(recount.b.df, nares.demo, by = "Sample")
-tidy.file <- file.path(results.dir, "NARES_recount2_B_tidy.tsv")
-readr::write_tsv(recount.b.df, tidy.file)
-```
-
-```{r}
-BoxplotDiffLV(tidy.b.df = recount.b.df, phenotype.column = "Classification",
-              pdf.path = file.path(plot.dir, 
-                                   "NARES_recount2_model_LV_boxplots.pdf"))
+nares.df.list <- LVTestWrapper(b.matrix = recount.b,
+                               sample.info.df = nares.demo,
+                               phenotype.col = "Classification",
+                               file.lead = "NARES_recount2_model", 
+                               plot.dir = plot.dir,
+                               results.dir = results.dir)
 ```
 
 ### Example LV
 
 ```{r}
+nares.limma.df <- nares.df.list$limma
 nares.limma.df %>% 
   dplyr::filter(adj.P.Val < 0.05) %>% 
   dplyr::arrange(adj.P.Val)
@@ -106,7 +89,11 @@ summary.file <- file.path("results", "08", "recount2_PLIER_summary.tsv")
 recount.summary <- readr::read_tsv(summary.file)
 ```
 
-Let's plot `LV96`, as it looks biologically interesting.
+Let's plot `LV96`, as it looks biologically interesting because of it's 
+putative association with natural killer (NK) cells. 
+We'd expect myeloid cell, specifically granulocyte, signatures to be 
+differentially expressed in this dataset, but not necessarily lymphocyte 
+signatures.
 First, does the _name_ agree with the recount2 PLIER summary?
 
 ```{r}
@@ -117,6 +104,7 @@ recount.summary %>%
 Yes, `SVM NK cells activated` is significantly associated with `LV96`.
 
 ```{r}
+recount.b.df <- nares.df.list$b.df
 recount.b.df %>%
   dplyr::filter(LV == "96,SVM NK cells activated") %>%
   ggplot2::ggplot(ggplot2::aes(x = Classification, y = Value)) +

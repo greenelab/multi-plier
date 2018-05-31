@@ -83,8 +83,10 @@ saveRDS(overlap, file = overlap.file)
 ### Venn Diagram
 
 ```{r}
-vd.file <- file.path(plot.dir, "AAV_FDR_0.05_overlap")
-VennDiagram::venn.diagram(x = sig.list, filename = vd.file, 
+vd.file <- file.path(plot.dir, "AAV_FDR_0.05_overlap.png")
+VennDiagram::venn.diagram(x = sig.list, filename = vd.file,
+                          imagetype = "png",
+                          resolution = 600,
                           category.names = c("NARES", "GPA blood", 
                                              "ERCB glomeruli"))
 ```
