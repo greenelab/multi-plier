@@ -182,33 +182,10 @@ pbmc.b <- recount.b[, pbmc.df$Sample]
 ### Differential expression analysis itself
 
 ```{r}
-# get the phenotype labels -- we'll use GPA signature status
-gpa.sig.vector <- pbmc.df$GPA_signature
-names(gpa.sig.vector) <- pbmc.df$Sample
-```
-
-```{r}
-# tests for differential expression
-limma.df <- TestLVDifferences(b.matrix = pbmc.b,
-                              phenotype = gpa.sig.vector)
-dlve.file <- file.path(results.dir, 
-                       "GPA_blood_recount2_model_LV_limma_results.tsv")
-readr::write_tsv(limma.df, path = dlve.file)
-```
-
-```{r}
-# plotting
-# first, long format
-pbmc.b.df <- reshape2::melt(pbmc.b)
-colnames(pbmc.b.df) <- c("LV", "Sample", "Value")
-# join with sample metadata
-pbmc.b.df <- dplyr::inner_join(pbmc.df, pbmc.b.df, by = "Sample")
-tidy.file <- file.path(results.dir, "GPA_blood_recount2_B_tidy_PBMC_only.tsv")
-readr::write_tsv(pbmc.b.df, tidy.file)
-
-# box plots
-boxplot.file <- file.path(plot.dir, "GPA_blood_recount2_model_LV_boxplots.pdf")
-BoxplotDiffLV(tidy.b.df = pbmc.b.df,
-              phenotype.column = "GPA_signature",
-              pdf.path = boxplot.file)
+LVTestWrapper(b.matrix = pbmc.b,
+              sample.info.df = pbmc.df,
+              phenotype.col = "GPA_signature",
+              file.lead = "GPA_blood_recount2_model",
+              plot.dir = plot.dir,
+              results.dir = results.dir)
 ```
