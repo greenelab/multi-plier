@@ -8,9 +8,10 @@ output:
 
 **J. Taroni 2018**
 
-The NARES study ([Grayson, et al. _Arthritis Rheumatol_. 2015](https://dx.doi.org/10.1002/art.39185)) included three sets of patients
-with ANCA-associated vasculitis: those with active nasal disease, prior nasal
-disease, and those with no history of nasal disease.
+The NARES study ([Grayson, et al. _Arthritis Rheumatol_. 2015](https://dx.doi.org/10.1002/art.39185)) 
+included three sets of patients with ANCA-associated vasculitis: those with 
+active nasal disease, prior nasal disease, and those with no history of nasal 
+disease.
 There is also a composite comparator group.
 
 Here, we'll test for PLIER LVs that are differentially expressed between groups.
@@ -22,6 +23,114 @@ we have demonstrated the validity of this approach in prior analyses.
 ```{r}
 `%>%` <- dplyr::`%>%` 
 source(file.path("util", "test_LV_differences.R"))
+```
+
+```{r}
+LVTestWrapper <- function(b.matrix,
+                          sample.info.df,
+                          phenotype.col,
+                          file.lead,
+                          plot.dir = "plots",
+                          results.dir = "results",
+                          use.bonferroni = FALSE,
+                          significant.only = FALSE,
+                          sig.threshold = 0.05) {
+  # A wrapper function for TestLVDifferences and BoxplotDiffLV; does the 
+  # reshaping required for plotting. Produces the following files: 1) tsv of the
+  # differential expression results 2) a long form of the B matrix joined with
+  # the sample information (sample.info.df) and 3) a PDF of boxplots
+  # 
+  # Args:
+  #   b.matrix: a B matrix (latent variables are rows, samples are columns) 
+  #             from a PLIER model. Can be the B element of the list 
+  #             returned by PLIER::PLIER or the output of GetNewDataB
+  #   sample.info.df: a long form data.frame that contains sample information,
+  #                   sample names that match the B matrix sample identifiers
+  #                   must be in a "Sample" column & it also must contain
+  #                   the factor to group by for testing differential expression
+  #                   (DE) and plotting
+  #   phenotype.col: the column name of the column in sample.info.df to be used
+  #                  for DE and plotting; character
+  #   file.lead: string that designates the "beginning" of filenames
+  #   plot.dir: plot directory where the boxplots PDF should be saved
+  #   results.dir: results directory for DE results and reshaped B data.frame
+  #   use.bonferroni: logical - should bonferroni correction be used for DE? 
+  #                   if FALSE (default), will use "BH"
+  #   significant.only: logical - should only differentially expressed LVs be
+  #                     plotted? if FALSE (default), all will be plotted
+  #   sig.threshold: the adj. P cutoff to be used if only plotting significant 
+  #                  results; default is 0.05
+  #                  
+  # Returns:
+  #   A list with the following elements
+  #       limma: the results from TestLVDifferences 
+  #       b.df: sample.b.df, prior to any filtering for plotting (if applicable)
+  # 
+  #   the following files are written by this function (see above):
+  #     1) <results.dir>/<file.lead>_LV_limma_results.tsv
+  #     2) <results.dir>/<file.lead>_B_long_sample_info.tsv
+  #     3) <plot.dir>/<file.lead>_LV_boxplots.pdf
+  
+  `%>%` <- dplyr::`%>%`
+  
+  # error-handling
+  # we need to join by "Sample" column for boxplots
+  if (!("Sample" %in% colnames(sample.info.df))) {
+    stop("'Sample' must be a column in sample.info.df")
+  }
+  # phenotype.col needs to be in column names
+  if (!(phenotype.col %in% colnames(sample.info.df))) {
+    stop("phenotype.col must be a column name in sample.info.df")
+  }
+  
+  # initialize list to hold results to be returned
+  return.list <- list()
+
+  #### Differential Expression ####
+  # get the named vector to use as the phenotype for testing differential 
+  # expression
+  phenotype.vector <- as.factor(make.names(sample.info.df[[phenotype.col]]))
+  names(phenotype.vector) <- sample.info.df$Sample
+  # test itself
+  limma.df <- TestLVDifferences(b.matrix = b.matrix,
+                                phenotype = phenotype.vector,
+                                use.bonferroni = use.bonferroni)
+  # write to file
+  dlve.file <- file.path(results.dir, 
+                         paste0(file.lead, "_LV_limma_results.tsv"))
+  readr::write_tsv(limma.df, path = dlve.file)
+  # add to list to be returned
+  return.list[["limma"]] <- limma.df
+  
+  #### Reshape & join with sample information ####
+  b.df <- reshape2::melt(b.matrix)
+  colnames(b.df) <- c("LV", "Sample", "Value")
+  sample.b.df <- dplyr::inner_join(b.df, sample.info.df, by = "Sample")
+  long.file <- file.path(results.dir, 
+                         paste0(file.lead, "_B_long_sample_info.tsv"))
+  readr::write_tsv(sample.b.df, long.file)
+  # add to list to be returned
+  return.list[["b.df"]] <- sample.b.df
+  
+  #### Plotting ####
+  plot.file <- file.path(plot.dir,
+                         paste0(file.lead, "_LV_boxplots.pdf"))
+  
+  # if we only want significant LVs plotted, filter sample.b.df using the
+  # adj.P.Val cutoff sig.threshold
+  if (significant.only) {
+    sig.lvs <- limma.df$LV[which(limma.df$adj.P.Val < sig.threshold)]
+    sample.b.df <- sample.b.df %>%
+      dplyr::filter(LV %in% sig.lvs)
+  }
+  
+  BoxplotDiffLV(tidy.b.df = sample.b.df, 
+                phenotype.column = phenotype.col,
+                pdf.path = plot.file)
+  
+
+  return(return.list)
+}
 ```
 
 ```{r}
@@ -65,40 +174,18 @@ We're going to compare the seven classification groups, which correspond to
 different disease labels (and were recoded above).
 
 ```{r}
-# the custom function TestLVDifferences requires a named vector
-classification.vector <- as.factor(make.names(nares.demo$Classification))
-names(classification.vector) <- nares.demo$Sample
-```
-
-```{r}
-# the test for differential expression & write to file
-# this is using BH correction for multiple testing
-nares.limma.df <- TestLVDifferences(b.matrix = recount.b,
-                                    phenotype = classification.vector)
-dlve.file <- file.path(results.dir, "NARES_recount2_model_LV_limma_results.tsv")
-readr::write_tsv(nares.limma.df, path = dlve.file)
-```
-
-We'll make box plots comparing these as well. 
-
-```{r}
-# the box plot function requires a long format data.frame
-recount.b.df <- reshape2::melt(recount.b)
-colnames(recount.b.df) <- c("LV", "Sample", "Value")
-recount.b.df <- dplyr::inner_join(recount.b.df, nares.demo, by = "Sample")
-tidy.file <- file.path(results.dir, "NARES_recount2_B_tidy.tsv")
-readr::write_tsv(recount.b.df, tidy.file)
-```
-
-```{r}
-BoxplotDiffLV(tidy.b.df = recount.b.df, phenotype.column = "Classification",
-              pdf.path = file.path(plot.dir, 
-                                   "NARES_recount2_model_LV_boxplots.pdf"))
+nares.df.list <- LVTestWrapper(b.matrix = recount.b,
+                                sample.info.df = nares.demo,
+                                phenotype.col = "Classification",
+                                file.lead = "NARES_recount2_model", 
+                                plot.dir = plot.dir,
+                                results.dir = results.dir)
 ```
 
 ### Example LV
 
 ```{r}
+nares.limma.df <- nares.df.list$limma
 nares.limma.df %>% 
   dplyr::filter(adj.P.Val < 0.05) %>% 
   dplyr::arrange(adj.P.Val)
@@ -125,6 +212,7 @@ recount.summary %>%
 Yes, `SVM NK cells activated` is significantly associated with `LV96`.
 
 ```{r}
+recount.b.df <- nares.df.list$b.df
 recount.b.df %>%
   dplyr::filter(LV == "96,SVM NK cells activated") %>%
   ggplot2::ggplot(ggplot2::aes(x = Classification, y = Value)) +
