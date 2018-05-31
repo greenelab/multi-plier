@@ -1,0 +1,144 @@
+---
+title: "Plotting for the repeated SLE WB and subsampled recount2 model evaluations"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In `15-evaluate_subsampling` and `16-repeat_sle_wb_PLIER.R`, we calculated some
+measures of PLIER model performance (e.g., sparsity of `U`). 
+We'll plot the results for those two sets of training data in this notebook.
+
+## Functions and directory setup
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "17")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "17")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+Read in the three `data.frame` from each set of experiments: sparsity, 
+pathway coverage, and number of LVs.
+
+### SLE WB repeats
+
+```{r}
+sle.sparsity <- readr::read_tsv(file.path("results", "16",
+                                          "sle-wb_repeated_sparsity.tsv")) %>%
+                  dplyr::mutate(training_set = "SLE")
+sle.num.lvs <- readr::read_tsv(file.path("results", "16",
+                                          "sle-wb_repeated_num_lvs.tsv")) %>%
+                  dplyr::mutate(training_set = "SLE")
+sle.pathway <- readr::read_tsv(file.path("results", "16",
+                                          "sle-wb_repeated_pathway.tsv")) %>%
+                  dplyr::mutate(training_set = "SLE")
+```
+
+### Subsampled recount2
+
+```{r}
+recount.sparsity <- readr::read_tsv(file.path("results", "15",
+                                          "subsampled_sparsity.tsv")) %>%
+                  dplyr::mutate(training_set = "recount2 subsampled")
+recount.num.lvs <- readr::read_tsv(file.path("results", "15",
+                                          "subsampled_num_lvs.tsv")) %>%
+                  dplyr::mutate(training_set = "recount2 subsampled")
+recount.pathway <- readr::read_tsv(file.path("results", "15",
+                                          "subsampled_pathway.tsv")) %>%
+                  dplyr::mutate(training_set = "recount2 subsampled")
+```
+
+### Bind two experiments
+
+```{r}
+num.lvs.df <- dplyr::bind_rows(sle.num.lvs, recount.num.lvs)
+pathway.df <- dplyr::bind_rows(sle.pathway, recount.pathway)
+sparsity.df <- dplyr::bind_rows(sle.sparsity, recount.sparsity)
+rm(sle.num.lvs, sle.pathway, sle.sparsity, recount.num.lvs, recount.pathway,
+     recount.sparsity)
+```
+
+## Plotting
+
+#### Number of latent variables
+
+```{r}
+num.lvs.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = training_set, y = num_lvs,
+                               group = training_set)) +
+  ggplot2::geom_boxplot() +
+  ggplot2::geom_point(position = ggplot2::position_jitter(0.2),
+                      alpha = 0.5) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "training set", 
+                y = "number of latent variables",
+                title = "PLIER model n = 1640")
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "number_of_lvs.pdf")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+#### Pathway coverage
+
+```{r}
+pathway.df %>%
+  dplyr::filter(pathway_coverage_type != "sig.pathway.by.lv") %>%
+  dplyr::mutate(pathway_coverage_type = 
+                  dplyr::case_when(
+                    (pathway_coverage_type == "lv") ~ "LV associated with pathways",
+                    (pathway_coverage_type =="pathway") ~ "pathway coverage"
+                  )) %>%
+  ggplot2::ggplot(ggplot2::aes(x = training_set, y = value)) +
+  ggplot2::geom_boxplot() +
+  ggplot2::geom_point(position = ggplot2::position_jitter(0.2),
+                      alpha = 0.5) +
+  ggplot2::facet_grid(~ pathway_coverage_type) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "training set", 
+                y = "proportion",
+                title = "PLIER model n = 1640")
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "pathway_coverage.pdf")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
+
+#### `U` sparsity
+
+```{r}
+sparsity.df %>%
+  dplyr::mutate(sparsity_type = 
+                dplyr::case_when(
+                  (sparsity_type == "all.sparsity") ~ "All",
+                  (sparsity_type == "sig.sparsity") ~ "Significant association only"
+                )) %>%
+  ggplot2::ggplot(ggplot2::aes(x = training_set, y = value)) +
+  ggplot2::geom_violin() +
+  ggplot2::stat_summary(fun.y = median, geom = "point", shape = 18,
+                        size = 4) +
+  ggplot2::facet_grid(~ sparsity_type) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "training set", 
+                y = "proportion of positive entries in U",
+                title = "PLIER model n = 1640")
+```
+
+
+```{r}
+plot.file <- file.path(plot.dir, "u_sparsity.pdf")
+ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
+```
