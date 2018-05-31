@@ -47,7 +47,7 @@ Let's explore `LV 599` a little further.
 
 ```{r}
 recount.b.file <- file.path("results", "19", 
-                            "GPA_blood_recount2_B_tidy_PBMC_only.tsv")
+                            "GPA_blood_recount2_model_B_long_sample_info.tsv")
 recount.b.df <- readr::read_tsv(recount.b.file) %>%
   dplyr::mutate(GPA_signature =
                   dplyr::case_when(
