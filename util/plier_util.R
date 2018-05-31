@@ -370,3 +370,35 @@ CalculateUSparsity <- function(plier.results, significant.only = FALSE,
   # return proportion information
   return(prop.vector)
 }
+
+EvalWrapper <- function(plier.model){
+  # Wrapper function for evaluation of PLIER models, takes a PLIER model 
+  # (output of PLIER::PLIER, typically via the custom function 
+  # PLIERNewData) and outputs the following metrics: 1) U sparsity (all LVs) 
+  # 2) U sparsity (only significant LVs taken into account) 3) pathway coverage
+  # metrics 4) number of LVs
+  #
+  # Args:
+  #   plier.model: output of PLIER::PLIER, typically via the custom function 
+  #                PLIERNewData
+  #
+  # Returns:
+  #   A list with the following elements 1) all.sparsity 2) sig.sparsity 
+  #   3) pathway.coverage 4) num.lvs -- see above'
+  
+  # Initialize list
+  return.list <- list()
+  # U sparsity
+  return.list$all.sparsity <- CalculateUSparsity(plier.model)
+  return.list$sig.sparsity <- CalculateUSparsity(plier.model, 
+                                                 significant.only = TRUE,
+                                                 fdr.cutoff = 0.05)
+  # pathway coverage metrics (3 of them)
+  return.list$pathway.coverage <- GetPathwayCoverage(plier.model, 
+                                                     fdr.cutoff = 0.05)
+  # number of latent variables
+  return.list$num.lvs <- nrow(plier.model$B)
+  
+  return(return.list)
+  
+}
