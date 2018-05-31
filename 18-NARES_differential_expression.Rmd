@@ -106,7 +106,11 @@ summary.file <- file.path("results", "08", "recount2_PLIER_summary.tsv")
 recount.summary <- readr::read_tsv(summary.file)
 ```
 
-Let's plot `LV96`, as it looks biologically interesting.
+Let's plot `LV96`, as it looks biologically interesting because of it's 
+putative association with natural killer (NK) cells. 
+We'd expect myeloid cell, specifically granulocyte, signatures to be 
+differentially expressed in this dataset, but not necessarily lymphocyte 
+signatures.
 First, does the _name_ agree with the recount2 PLIER summary?
 
 ```{r}
