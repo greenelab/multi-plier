@@ -75,15 +75,17 @@ clinical.df <- clinical.df %>%
                                `Tissue Source` == "Glomeruli")
 
 # diagnosis information only - this will serve as group labels
-diagnosis.df <- clinical.df[, c("Microarray Sample ID", "Diagnosis")]
-
 # recode diagnosis such that nephrotic syndrome diagnoses are grouped
-diagnosis.df$Diagnosis <-
-  dplyr::recode(diagnosis.df$Diagnosis,
-                MCD = "Nephrotic syndrome",
-                MN = "Nephrotic syndrome",
-                FSGS = "Nephrotic syndrome",
-                `FSGS/MCD` = "Nephrotic syndrome")
+diagnosis.df <- clinical.df %>%
+  dplyr::select(c(`Microarray Sample ID`, Diagnosis)) %>%
+  dplyr::mutate(Diagnosis = 
+                  dplyr::recode(Diagnosis,
+                                MCD = "Nephrotic syndrome",
+                                MN = "Nephrotic syndrome",
+                                FSGS = "Nephrotic syndrome",
+                                `FSGS/MCD` = "Nephrotic syndrome"),
+                Sample = `Microarray Sample ID`) %>%
+  dplyr::select(c(Sample, Diagnosis))
 ```
 
 ## Apply recount2 model
@@ -106,34 +108,10 @@ saveRDS(recount.b, file = b.file)
 ## Differential expression
 
 ```{r}
-# testing the differences between living donors, nephrotic syndrome, AAV
-diagnosis.vector <- make.names(diagnosis.df$Diagnosis)
-names(diagnosis.vector) <- diagnosis.df$`Microarray Sample ID`
-```
-
-```{r}
-limma.df <- TestLVDifferences(b.matrix = recount.b,
-                              phenotype = diagnosis.vector)
-readr::write_tsv(x = limma.df,
-                 path = file.path(results.dir, 
-                                  "ERCB_glom_recount2_model_LV_limma_results.tsv"))
-```
-
-### Plotting
-
-```{r}
-recount.b.df <- reshape2::melt(recount.b)
-colnames(recount.b.df) <- c("LV", "Sample", "Value")
-recount.b.df <- dplyr::inner_join(recount.b.df,
-                                  diagnosis.df,
-                                  by = c("Sample" = "Microarray Sample ID"))
-tidy.file <- file.path(results.dir, "ERCB_glom_recount2_B_tidy.tsv")
-readr::write_tsv(recount.b.df, tidy.file)
-```
-
-```{r}
-boxplot.file <- file.path(plot.dir, "ERCB_glom_recount2_model_LV_boxplots.pdf")
-BoxplotDiffLV(tidy.b.df = recount.b.df,
-              phenotype.column = "Diagnosis",
-              pdf.path = boxplot.file)
+LVTestWrapper(b.matrix = recount.b,
+              sample.info.df = diagnosis.df,
+              phenotype.col = "Diagnosis",
+              file.lead = "ERCB_glom_recount2_model",
+              plot.dir = plot.dir,
+              results.dir = results.dir)
 ```
