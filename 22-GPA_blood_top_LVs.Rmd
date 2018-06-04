@@ -68,8 +68,7 @@ recount.b.df %>%
                 title = "Cheadle, et al. top LV") +
   ggplot2::theme(legend.position = "none",
                  text = ggplot2::element_text(size = 15),
-                 plot.title = ggplot2::element_text(hjust = 0.5, 
-                                                    face = "bold"))
+                 plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
 ```
 
 ```{r}
@@ -135,7 +134,7 @@ top.z.df$Gene <- factor(top.z.df$Gene,
 ```
 
 ```{r}
-ggplot2::ggplot(top.z.df, 
+p <- ggplot2::ggplot(top.z.df, 
                 ggplot2::aes(x = Gene, y = Z, fill = Autoantigen)) +
   ggplot2::geom_bar(stat = "identity") +
   ggplot2::theme_bw() +
@@ -144,12 +143,13 @@ ggplot2::ggplot(top.z.df,
   ggplot2::ggtitle("recount2 LV 599 Loadings") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
                                                     face = "bold"))
+p + ggplot2::theme(axis.text = ggplot2::element_text(size = 6)) 
 ```
 
 ```{r}
 plot.file <- file.path(plot.dir, "recount2_LV599_top_Z_bar.pdf")
 ggplot2::ggsave(plot.file, 
-                plot = ggplot2::last_plot() + 
+                plot = p + 
                   ggplot2::theme(text = ggplot2::element_text(size = 15)), 
                 width = 6, height = 8)
 ```
@@ -242,7 +242,7 @@ top.z.df$Gene <- factor(top.z.df$Gene,
 ```
 
 ```{r}
-ggplot2::ggplot(top.z.df, 
+p <- ggplot2::ggplot(top.z.df, 
                 ggplot2::aes(x = Gene, y = Z, fill = Autoantigen)) +
   ggplot2::geom_bar(stat = "identity") +
   ggplot2::theme_bw() +
@@ -250,12 +250,13 @@ ggplot2::ggplot(top.z.df,
   ggplot2::coord_flip() +
   ggplot2::ggtitle("GPA Blood LV 8 Loadings") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"))
+p + ggplot2::theme(axis.text = ggplot2::element_text(size = 6)) 
 ```
 
 ```{r}
 plot.file <- file.path(plot.dir, "GPA_blood_LV8_top_Z_bar.pdf")
 ggplot2::ggsave(plot.file, 
-                plot = ggplot2::last_plot() + 
+                plot = p + 
                   ggplot2::theme(text = ggplot2::element_text(size = 15)), 
                 width = 6, height = 8)
 ```
@@ -321,6 +322,25 @@ mapping.df
 
 It looks like `GPA blood LV 8` does in fact map to `recount2 LV 68` as 
 determined by taking the Pearson correlation between loadings.
+
+#### Heatmap of mapping
+
+We'll select the top mapping LVs from the recount2 model as well as 
+`recount2 LV 599` from `impt.cor.z.mat` for plotting as a heatmap.
+
+```{r}
+plot.index <- which(rownames(impt.cor.z.mat) %in% 
+                      c(as.character(mapping.df$recount_LV), "recountLV599"))
+heatmap.mat <- impt.cor.z.mat[plot.index, ]
+pheatmap::pheatmap(heatmap.mat, main = "Z matrix mapping")
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "selected_cor_z_mat_heatmap.pdf")
+pdf(plot.file)
+pheatmap::pheatmap(heatmap.mat, main = "Z matrix mapping")
+dev.off()
+```
 
 ## Summary
 
