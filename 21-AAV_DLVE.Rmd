@@ -19,13 +19,12 @@ At first, we'll take the naive approach of just looking at the overlapping
 sets of significant LVs.
 There's no guarantee that the directionality will be in agreement this way.
 
-## Install VennDiagram
+## Install VennDiagram & cowplot
 
 ```{r}
-# current version on CRAN
-package.url <- "https://cran.r-project.org/src/contrib/VennDiagram_1.6.20.tar.gz"
-install.packages(package.url, repos = NULL, type = 'source')
-rm(package.url)
+# current versions on CRAN
+devtools::install_url("https://cran.r-project.org/src/contrib/VennDiagram_1.6.20.tar.gz")
+devtools::install_url("https://cran.r-project.org/src/contrib/cowplot_0.9.2.tar.gz")
 ```
 
 ## Functions and directory set up
@@ -43,7 +42,10 @@ results.dir <- file.path("results", "21")
 dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
-## Read in data
+
+## Find overlap
+
+### Read in data
 
 ```{r}
 # files with all the limma results
@@ -61,7 +63,7 @@ blood.df <- readr::read_tsv(blood.file)
 kidney.df <- readr::read_tsv(kidney.file)
 ```
 
-## Identify significant LVs
+### Identify significant LVs
 
 ```{r}
 # initialize list to hold significant pathways for each of the datasets -- this
@@ -72,7 +74,7 @@ sig.list[["blood"]] <- blood.df$LV[which(blood.df$adj.P.Val < 0.05)]
 sig.list[["kidney"]] <- kidney.df$LV[which(kidney.df$adj.P.Val < 0.05)]
 ```
 
-## Overlap
+### Overlap
 
 ```{r}
 overlap <- VennDiagram::calculate.overlap(sig.list)
@@ -101,3 +103,166 @@ lapply(overlap, length)
 ```{r}
 overlap$a5
 ```
+
+```{r}
+# remove files & data.frame no longer needed once we have the overlap
+rm(list = setdiff(ls(), c("%>%", "overlap", "plot.dir", "results.list")))
+```
+
+## Plotting overlapping LVs
+
+```{r}
+lvs.to.plot <- overlap$a5
+```
+
+### B data.frames
+
+We'll use these, from the individual dataset notebooks, for plotting.
+
+```{r}
+nares.file <- file.path("results", "18", 
+                        "NARES_recount2_model_B_long_sample_info.tsv")
+nares.df <- readr::read_tsv(nares.file)
+gpa.file <- file.path("results", "19", 
+                      "GPA_blood_recount2_model_B_long_sample_info.tsv")
+gpa.df <- readr::read_tsv(gpa.file)
+kidney.file <- file.path("results", "20", 
+                         "ERCB_glom_recount2_model_B_long_sample_info.tsv")
+kidney.df <- readr::read_tsv(kidney.file)
+```
+
+#### Recoding and reordering
+
+We'll want the plots to be in the same general order and for the x-axis labels
+to display well.
+
+```{r}
+# Nasal brushing data
+nares.df <- nares.df %>%  
+  dplyr::mutate(Classification =
+                  dplyr::recode(Classification,
+                    `GPA with active nasal disease` = "GPA active",
+                    `GPA with prior nasal disease` = "GPA prior",
+                    `GPA (no prior nasal disease)` = "GPA none"
+                  )) %>%
+  dplyr::mutate(Classification = 
+                  factor(Classification, 
+                            levels = c("GPA active",
+                                       "GPA prior",
+                                       "GPA none",
+                                       "EGPA",
+                                       "Allergic Rhinitis",
+                                       "Sarcoidosis",
+                                       "Healthy")))
+```
+
+```{r}
+# GPA PBMC data
+gpa.df <- gpa.df %>%
+  dplyr::mutate(GPA_signature = dplyr::recode(GPA_signature, 
+                                              GPApos = "GPA-positive",
+                                              GPAneg = "GPA-negative",
+                                              Control = "Control")) %>%
+  dplyr::mutate(GPA_signature = factor(GPA_signature,
+                                       levels = c("GPA-positive", 
+                                                  "GPA-negative", 
+                                                  "Control"))) 
+```
+
+```{r}
+kidney.df <- kidney.df %>%
+  dplyr::mutate(Diagnosis = factor(Diagnosis, 
+                                   levels = c("Vasculitis", 
+                                              "Nephrotic syndrome",
+                                              "Living donor control")))
+```
+
+### Plotting functions
+
+```{r}
+# for use with ggplot2::stat_summary
+CISummary <- function(x) {
+  # Mean, 95% CI
+  # https://www.cyclismo.org/tutorial/R/confidence.html
+  m <- mean(x)
+  err <- qt(0.975, df = length(x) - 1) * sd(x) / sqrt(length(x))
+  ymin <- m - err
+  ymax <- m + err
+  return(c(y = m, ymin = ymin, ymax = ymax))
+}
+
+# custom ggplot2 theme
+custom_theme <- function() {
+  ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, 
+                                                       hjust = 1),
+                   legend.position = "none",
+                   plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                      face = "bold"),
+                   axis.title.x = ggplot2::element_blank()) 
+}
+```
+
+```{r}
+# wrapper function for plotting the three datasets -- this is only intended to 
+# be used in this environment
+MultiPlotWrapper <- function(lv.name) {
+  # lv.name: string to be passed to dplyr::filter -- one LV plotted at a time
+  
+  #### NARES ####
+  nares.p <- nares.df %>%
+    dplyr::filter(LV == lv.name) %>%
+    ggplot2::ggplot(ggplot2::aes(x = Classification, y = Value)) +
+      ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
+                           ggplot2::aes(colour = Classification)) +
+      ggplot2::stat_summary(geom = "pointrange", fun.data = CISummary) +
+      ggplot2::labs(y = lv.name, title = "NARES") +
+      ggplot2::scale_color_manual(values = c("#2F4F4F", "#191970", "#20B2AA",
+                                             "#666666", "#CDCD00", "#FF4500",
+                                             "#FF8C69")) +
+      custom_theme()
+  
+  #### Glomeruli ####
+  glom.p <- kidney.df %>% 
+    dplyr::filter(LV == "524,IRIS_Neutrophil-Resting") %>%
+    ggplot2::ggplot(ggplot2::aes(x = Diagnosis, y = Value)) +
+      ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
+                           ggplot2::aes(colour = Diagnosis)) +
+      ggplot2::stat_summary(geom = "pointrange", fun.data = CISummary) +
+      ggplot2::labs(y = lv.name, title = "Glomeruli") +
+      ggplot2::scale_color_manual(values = c("#2F4F4F", "#666666", "#FF8C69")) +
+      custom_theme()
+  
+  #### PBMC ####
+  pbmc.p <- gpa.df %>%
+    dplyr::filter(LV == lv.name) %>%
+    ggplot2::ggplot(ggplot2::aes(x = GPA_signature, y = Value)) +
+      ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
+                         ggplot2::aes(colour = GPA_signature)) +
+      ggplot2::stat_summary(geom = "pointrange", fun.data = CISummary) +
+      ggplot2::labs(y = lv.name, title = "GPA PBMCs") +
+      ggplot2::scale_color_manual(values = c("#2F4F4F", "#20B2AA", "#FF8C69")) +
+      custom_theme()  
+  
+  #### Return multipanel plot ####
+  return(cowplot::plot_grid(nares.p, glom.p, pbmc.p, align = "h", ncol = 3))
+    
+}
+
+```
+
+### Plotting itself
+
+```{r}
+# list to hold the multipanel plots
+plot.list <- lapply(lvs.to.plot, MultiPlotWrapper)
+```
+
+```{r}
+plot.file <- file.path(plot.dir, "significant_LVs_3_AAV_sets.pdf")
+pdf(plot.file, width = 8, height = 6, onefile = TRUE)
+plot.list
+dev.off()
+```
+
+
