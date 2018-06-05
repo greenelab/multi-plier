@@ -1,0 +1,90 @@
+---
+title: "recount2 LVs in more severe or active ANCA-associated vasculitis"
+output: html_notebook
+---
+
+**J. Taroni 2018**
+
+In `21-AAV_DLVE`, we identified LVs that are differentially expressed in all
+the ANCA-associated vasculitis datasets.
+In this notebook, we'll do exploratory analyses of some of the recount2 PLIER
+model LVs that look like they may be elevated in more severe or active AAV.
+
+## Functions and directory set up
+
+```{r}
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "23")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "23")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+### recount2 PLIER model
+
+```{r}
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data",
+                                   "recount_PLIER_model.RDS"))
+```
+
+## Explore LV10
+
+Let's look at all the pathways associated with this LV.
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 10,
+                FDR < 0.05)
+```
+
+```{r}
+head(sort(recount.plier$Z[, 10], decreasing = TRUE), 50)
+```
+
+## Explore LV524
+
+Let's look at all the pathways associated with this LV.
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 524,
+                FDR < 0.05)
+```
+
+This is certainly capturing something about the myeloid lineage.
+Recall that this LV was correlated with neutrophil count from the 
+Banchereau, et al. dataset when we analyzed it in 
+`07-sle_cell_type_recount2_model`.
+
+Let's take a look at the genes contributing to this signal.
+
+```{r}
+head(sort(recount.plier$Z[, 524], decreasing = TRUE), 50)
+```
+
+## Explore LV624
+
+No significant pathways.
+
+```{r}
+head(sort(recount.plier$Z[, 624], decreasing = TRUE), 50)
+```
+
+## Explore LV937
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 937,
+                FDR < 0.05)
+```
+
+```{r}
+head(sort(recount.plier$Z[, 937], decreasing = TRUE), 50)
+```
