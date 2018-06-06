@@ -180,16 +180,7 @@ kidney.df <- kidney.df %>%
 ### Plotting functions
 
 ```{r}
-# for use with ggplot2::stat_summary
-CISummary <- function(x) {
-  # Mean, 95% CI
-  # https://www.cyclismo.org/tutorial/R/confidence.html
-  m <- mean(x)
-  err <- qt(0.975, df = length(x) - 1) * sd(x) / sqrt(length(x))
-  ymin <- m - err
-  ymax <- m + err
-  return(c(y = m, ymin = ymin, ymax = ymax))
-}
+mean_ci <- function(x) ggplot2::mean_se(x, mult = 2)
 
 # custom ggplot2 theme
 custom_theme <- function() {
@@ -215,7 +206,8 @@ MultiPlotWrapper <- function(lv.name) {
     ggplot2::ggplot(ggplot2::aes(x = Classification, y = Value)) +
       ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
                            ggplot2::aes(colour = Classification)) +
-      ggplot2::stat_summary(geom = "pointrange", fun.data = CISummary) +
+      ggplot2::stat_summary(geom = "pointrange", 
+                            fun.data = mean_ci) +
       ggplot2::labs(y = lv.name, title = "NARES") +
       ggplot2::scale_color_manual(values = c("#2F4F4F", "#191970", "#20B2AA",
                                              "#666666", "#CDCD00", "#FF4500",
@@ -224,11 +216,12 @@ MultiPlotWrapper <- function(lv.name) {
   
   #### Glomeruli ####
   glom.p <- kidney.df %>% 
-    dplyr::filter(LV == "524,IRIS_Neutrophil-Resting") %>%
+    dplyr::filter(LV == lv.name) %>%
     ggplot2::ggplot(ggplot2::aes(x = Diagnosis, y = Value)) +
       ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
                            ggplot2::aes(colour = Diagnosis)) +
-      ggplot2::stat_summary(geom = "pointrange", fun.data = CISummary) +
+      ggplot2::stat_summary(geom = "pointrange",
+                            fun.data = mean_ci) +
       ggplot2::labs(y = lv.name, title = "Glomeruli") +
       ggplot2::scale_color_manual(values = c("#2F4F4F", "#666666", "#FF8C69")) +
       custom_theme()
@@ -239,7 +232,8 @@ MultiPlotWrapper <- function(lv.name) {
     ggplot2::ggplot(ggplot2::aes(x = GPA_signature, y = Value)) +
       ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
                          ggplot2::aes(colour = GPA_signature)) +
-      ggplot2::stat_summary(geom = "pointrange", fun.data = CISummary) +
+      ggplot2::stat_summary(geom = "pointrange", 
+                            fun.data = mean_ci) +
       ggplot2::labs(y = lv.name, title = "GPA PBMCs") +
       ggplot2::scale_color_manual(values = c("#2F4F4F", "#20B2AA", "#FF8C69")) +
       custom_theme()  
