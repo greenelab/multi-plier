@@ -8,7 +8,8 @@ output: html_notebook
 In `21-AAV_DLVE`, we identified LVs that are differentially expressed in all
 the ANCA-associated vasculitis datasets.
 In this notebook, we'll do exploratory analyses of some of the recount2 PLIER
-model LVs that look like they may be elevated in more severe or active AAV.
+model LVs that look like they may be elevated in more severe or active AAV 
+except for `LV793` looks to be consistently downregulated.
 
 ## Functions and directory set up
 
@@ -75,6 +76,14 @@ No significant pathways.
 
 ```{r}
 head(sort(recount.plier$Z[, 624], decreasing = TRUE), 50)
+```
+
+## Explore LV793
+
+No significant pathways.
+
+```{r}
+head(sort(recount.plier$Z[, 793], decreasing = TRUE), 50)
 ```
 
 ## Explore LV937
