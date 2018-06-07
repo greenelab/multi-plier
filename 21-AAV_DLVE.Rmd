@@ -199,6 +199,8 @@ custom_theme <- function() {
 # be used in this environment
 MultiPlotWrapper <- function(lv.name) {
   # lv.name: string to be passed to dplyr::filter -- one LV plotted at a time
+  # returns a 3 panel plot with strip charts from the three tissues, the output
+  # of cowplot::plot_grid
   
   #### NARES ####
   nares.p <- nares.df %>%
