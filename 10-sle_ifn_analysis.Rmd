@@ -378,7 +378,7 @@ p <- PlotInteraction(df = recount.b.df,
                      y.var = "Value",
                      wrap.var = "LV",
                      y.label = "LV value",
-                     plot.title = "SLE WB PLIER - Treatment with AMG 811")
+                     plot.title = "recount2 PLIER - Treatment with AMG 811")
 
 plot.file <- file.path(plot.dir, "E-GEOD-78193_recount2_PLIER_boxplot.pdf")
 ggplot2::ggsave(plot.file, plot = p, width = 11, height = 7, units = "in")
