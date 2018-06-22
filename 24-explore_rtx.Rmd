@@ -1,0 +1,297 @@
+---
+title: "Explore the RTX data"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+## Functions and directory set up
+
+```{r}
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+source(file.path("util", "test_LV_differences.R"))
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "24")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "24")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+Specifically, we'll look at RNA-seq data that's been processed various ways 
+(e.g., taking into account experimental design or not, etc.).
+
+### Covariate information
+
+```{r}
+covariate.df <- readr::read_tsv(file.path("data", "rtx", 
+                                          "RTX_full_covariates.tsv"))
+```
+
+### Counts
+
+```{r}
+# tximport gene-level data -- includes counts, TPM
+gene.summary <- readRDS(file.path("data", "rtx", "tximport.RDS"))
+# extract count matrix -- we used `countsFromAbundance = "no"` to generate this
+count.matrix <- gene.summary$counts
+# log2 transform plus some constant, here 1, to account for zeros
+log.count <- log2(count.matrix + 1)
+```
+
+### VST - blind to experimental design
+
+```{r}
+vst.blind <- readr::read_tsv(file.path("data", "rtx", "VST_blind.pcl"))
+```
+
+### VST - batch, timepoint, responder status
+
+Note that the experimental design we gave the `DESeq2::vst` function may 
+ultimately not be the one we'd like to use.
+
+```{r}
+vst.design <- readr::read_tsv(file.path("data", "rtx", "VST_design.pcl"))
+```
+
+## PCA on full expression matrix
+
+```{r}
+PCAPlotWrapper <- function(exprs, plot.title) {
+  # This is only intended to be used in this global environment where we have
+  # covariate.df and the magrittr pipe already
+  # takes the rituximab expression data (exprs) where rows are genes and columns 
+  # are samples and makes a plot of PC1-2 with the title supplied as plot.title
+  # argument
+  
+  # PCA
+  pc.results <- prcomp(t(exprs))
+  cum.var.exp <- cumsum(pc.results$sdev^2 / sum(pc.results$sdev^2))
+  # PC1-2 in form suitable for ggplot2
+  pc.df <- as.data.frame(cbind(rownames(pc.results$x), pc.results$x[, 1:2]))
+  colnames(pc.df)[1] <- "Sample"
+  
+  # check that the barcodes are in agreement
+  barcode.check <- all(covariate.df$barcode == substr(pc.df[[1]], start = 1, 
+                                                      stop = 6))
+  if (!barcode.check) {
+    stop("Something went wrong, the sample barcodes are not in the same order!")
+  }
+  
+  # now that we've ensured that the barcodes are in the same order, we'll 
+  # add in the batch information
+  pc.df$Batch <- covariate.df$procbatch
+  
+  # plot!
+  pc.df %>% 
+    dplyr::mutate(PC1 = as.numeric(as.character(PC1)),
+                  PC2 = as.numeric(as.character(PC2))) %>%
+    ggplot2::ggplot(ggplot2::aes(x = PC1, y = PC2, color = Batch, 
+                                 shape = Batch)) +
+    ggplot2::geom_point(size = 3, alpha = 0.75) +
+    ggplot2::labs(x = paste("PC1 (cum. var. exp. =", round(cum.var.exp[1], 3), 
+                            ")"), 
+                  y =  paste("PC2 (cum. var. exp. =", round(cum.var.exp[2], 3), 
+                            ")"),
+                  title = plot.title) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(text = ggplot2::element_text(size = 15)) +
+    ggplot2::scale_color_manual(values = c("#000000", "#969696"))
+  
+}
+```
+
+```{r}
+# the count matrix itself does not have column names because of the way it was
+# processed
+colnames(log.count) <- colnames(vst.blind)[2:ncol(vst.blind)]
+PCAPlotWrapper(exprs = log.count, plot.title = "log2(counts + 1)")
+```
+
+```{r}
+PCAPlotWrapper(exprs = as.matrix(vst.blind[, 2:ncol(vst.blind)]),
+               plot.title = "VST (blind)")
+```
+
+```{r}
+PCAPlotWrapper(exprs = as.matrix(vst.design[, 2:ncol(vst.design)]),
+               plot.title = "VST")
+```
+
+## Gene identifier conversion
+
+All of the gene expression data from the RTX data set uses Ensembl gene IDs.
+PLIER, on the other hand, uses gene symbols.
+So we'll need to do conversion.
+Let's continue with variance stabilizing transformed data blinded to 
+experimental design.
+
+```{r}
+mart <- biomaRt::useDataset("hsapiens_gene_ensembl", 
+                            biomaRt::useMart("ensembl"))
+gene.df <- biomaRt::getBM(filters = "ensembl_gene_id",
+                          attributes = c("ensembl_gene_id", "hgnc_symbol"),
+                          values = vst.blind$Gene, 
+                          mart = mart)
+# filter to remove genes without a gene symbol
+gene.df <- gene.df %>% dplyr::filter(complete.cases(.))
+```
+
+```{r}
+vst.blind.annot <- dplyr::inner_join(gene.df, vst.blind,
+                                     by = c("ensembl_gene_id" = "Gene")) %>%
+  dplyr::select(-ensembl_gene_id)
+colnames(vst.blind.annot)[1] <- "Gene"
+
+# aggregate duplicate gene symbols to gene mean
+vst.agg <- PrepExpressionDF(vst.blind.annot)
+```
+
+## Read in recount2 PLIER model
+
+```{r}
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+Now filter the VST data to just the genes included in the recount2 model and
+prep it for use with various PLIER helper functions.
+
+```{r}
+vst.filt <- vst.agg %>% 
+  dplyr::filter(Gene %in% rownames(recount.plier$Z)) %>%
+  tibble::column_to_rownames(var = "Gene")
+# save to file
+vst.file <- file.path("data", "rtx", "VST_blind_filtered.RDS")
+saveRDS(vst.filt, vst.file)
+```
+
+```{r}
+# let's remove the other VST data.frames or matrices and extraneous biomart 
+# objects
+rm(vst.agg, vst.blind, vst.blind.annot, vst.design, mart, count.matrix)
+```
+
+```{r}
+PCAPlotWrapper(exprs = vst.filt,
+               plot.title = "VST filtered to genes in model")
+```
+
+## PLIER
+
+We'll give PLIER row-normalized (z-scored) TPM data, as this is closest to the
+form we had the recount2 data in (RPKM) and, given this use case, the slight 
+difference is unlikely to effect the results much.
+
+```{r}
+# get the gene-level TPM
+rtx.tpm <- gene.summary$abundance
+
+# we'll need to convert to HGNC gene symbol
+rtx.tpm <- tibble::rownames_to_column(data.frame(rtx.tpm), var = "Gene")
+rtx.tpm.annot <- dplyr::inner_join(gene.df, rtx.tpm,
+                                    by = c("ensembl_gene_id" = "Gene")) %>%
+  dplyr::select(-ensembl_gene_id)
+colnames(rtx.tpm.annot) <- c("Gene", colnames(log.count))
+
+# Aggregate duplicate gene identifiers to mean
+rtx.agg <- PrepExpressionDF(rtx.tpm.annot)
+
+# remove first row without identifier & write to file
+rtx.agg <- rtx.agg %>%
+  dplyr::filter(Gene != "")
+readr::write_tsv(rtx.agg, file.path("data", "rtx", "tpm_aggregated.pcl"))
+
+# get in expression matrix form
+rtx.exprs <- as.matrix(rtx.agg %>% tibble::column_to_rownames(var = "Gene"))
+```
+
+```{r}
+# remove intermediates
+rm(rtx.tpm.annot, rtx.tpm, rtx.agg)
+```
+
+```{r}
+# remove genes that are all zero
+remove.index <- which(apply(rtx.exprs, 1, function(x) all(x == 0)))
+rtx.exprs <- rtx.exprs[-remove.index, ]
+```
+
+### Dataset-specific model
+
+Training a PLIER model on this dataset
+
+```{r}
+rtx.plier <- PLIERNewData(exprs.mat = as.matrix(rtx.exprs))
+saveRDS(rtx.plier, file.path("data", "rtx", "RTX_PLIER_model.RDS"))
+```
+
+```{r}
+PLIER::plotU(rtx.plier, auc.cutoff = 0.75, fontsize_row = 7,
+             fontsize_col = 10)
+```
+
+There's no neutrophil signature with `AUC > 0.75`.
+That's interesting because this is a signal that we would expect in this
+whole blood data.
+
+```{r}
+pdf(file.path(plot.dir, "RTX_model_U_plot.pdf"))
+PLIER::plotU(rtx.plier, auc.cutoff = 0.75, fontsize_row = 7,
+             fontsize_col = 10)
+dev.off()
+```
+
+```{r}
+PCAPlotWrapper(exprs = rtx.plier$B, 
+               plot.title = "Dataset-specific PLIER B, All LVs")
+```
+
+### recount2 model
+
+```{r}
+recount.b <- GetNewDataB(exprs.mat = as.matrix(rtx.exprs),
+                         plier.model = recount.plier)
+saveRDS(recount.b, file.path("data", "rtx", "RTX_recount2_B.RDS"))
+```
+
+```{r}
+PCAPlotWrapper(exprs = recount.b, 
+               plot.title = "recount2 PLIER B, All LVs")
+```
+
+
+## Final plotting
+
+We'll plot the following three plots, as these are the expected into any kind
+of supervised machine learning model (predicting response):
+
+* VST expression data (only genes that overlap with recount2 PLIER model)
+* Dataset-specific PLIER B, all LVs
+* recount2 PLIER B, all LVs
+
+```{r}
+exprs.plot <- PCAPlotWrapper(exprs = vst.filt,
+                             plot.title = "VST filtered to genes in model")
+rtx.plot <- PCAPlotWrapper(exprs = rtx.plier$B, 
+                           plot.title = "Dataset-specific PLIER B, All LVs")
+recount.plot <- PCAPlotWrapper(exprs = recount.b, 
+                               plot.title = "recount2 PLIER B, All LVs")
+```
+
+```{r}
+pdf(file.path(plot.dir, "RTX_expected_ML_input_PCA.pdf"), height = 14, 
+    width = 7)
+cowplot::plot_grid(exprs.plot, rtx.plot, recount.plot, align = "h", ncol = 1)
+dev.off()
+```
+
