@@ -1,0 +1,266 @@
+---
+title: "First pass at predicting response from baseline samples in RTX trial"
+output: html_notebook
+---
+
+**J. Taroni 2018**
+
+## Install `caret`
+
+```{r}
+# devtools::install_github('topepo/caret/pkg/caret', 
+#                          ref = "6546939345fe10649cefcbfee55d58fb682bc902")
+# devtools::install_version("e1071", version = "1.6-8")
+```
+
+
+## Functions and directory set up
+
+```{r}
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "25")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "25")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+#### Covariates
+
+```{r}
+covariate.df <- readr::read_tsv(file.path("data", "rtx", 
+                                          "RTX_full_covariates.tsv"))
+```
+
+#### Gene expression data
+
+This is gene-level expression data that has been vst-transformed and filtered 
+to only genes that are in the recount2 PLIER model.
+
+```{r}
+exprs <- readRDS(file.path("data", "rtx", "VST_blind_filtered.RDS"))
+```
+
+#### recount2 `B`
+
+The multiPLIER approach
+
+```{r}
+recount.b <- readRDS(file.path("data", "rtx", "RTX_recount2_B.RDS"))
+```
+
+#### RTX PLIER model
+
+```{r}
+rtx.plier <- readRDS(file.path("data", "rtx", "RTX_PLIER_model.RDS"))
+rtx.b <- rtx.plier$B
+```
+
+
+## LASSO
+
+### Prep data
+
+First, we'll change the sample names to match the barcodes in the covariates.
+The first six characters of the current column/sample names should correspond
+to a barcode.
+
+```{r}
+# in the expression data
+colnames(exprs) <- substr(colnames(exprs), start = 1, stop = 6)
+all(covariate.df$barcode == colnames(exprs))
+```
+
+```{r}
+# in the recount B data
+colnames(recount.b) <- substr(colnames(recount.b), start = 1, stop = 6)
+all(covariate.df$barcode == colnames(recount.b))
+```
+
+```{r}
+# in the RTX B
+colnames(rtx.b) <- substr(colnames(rtx.b), start = 1, stop = 6)
+all(covariate.df$barcode == colnames(rtx.b))
+```
+
+The `mainclass` column in `covariate.df` is what we are interested in 
+predicting; it contains whether or not a patient is a _nonresponder_ or 
+_responder_ (divided into _tolerant_ or _nontolerant_ depending on, I believe, 
+long-term outcome) to treatment. 
+(We'll exclude samples with `NA` in this column.)
+
+We'll want to try and predict this from baseline samples 
+(`covariate.df$timepoint == "BL"`).
+We will not be adjusting for covariates at this point.
+The earlier publications on this trial suggest that the majority of 
+covariates have no significant association with response.
+
+Let's take a look at the sample size and class balance.
+
+```{r}
+table(covariate.df$mainclass, covariate.df$timepoint)
+```
+
+We can see that there are `r sum(covariate.df$timepoint == "BL")` baseline 
+samples and that the three classes (`Nonresponder`, `Nontolerant`, and 
+`Tolerant`) are pretty balanced.
+If we use these three classes, we can likely use a metric like total accuracy
+to evaluate performance.
+Also, the small sample size lends itself to leave-one-out cross-validataion 
+(LOOCV).
+
+```{r}
+# Do all baseline samples have response labels? No, one is NA 
+baseline.covariate.df <- covariate.df %>%
+  dplyr::filter(timepoint == "BL") %>%
+  dplyr::select(c("barcode", "timepoint", "mainclass")) %>%
+  dplyr::filter(complete.cases(.))
+```
+
+```{r}
+# we only want the baseline samples with a class label
+baseline.samples <- baseline.covariate.df$barcode
+```
+
+```{r}
+baseline.exprs <- t(exprs[, which(colnames(exprs) %in% baseline.samples)])
+dim(baseline.exprs)
+```
+
+```{r}
+recount.baseline.b <- 
+  t(recount.b[, which(colnames(recount.b) %in% baseline.samples)])
+dim(recount.baseline.b)
+```
+
+```{r}
+rtx.baseline.b <- t(rtx.b[, which(colnames(rtx.b) %in% baseline.samples)])
+dim(rtx.baseline.b)
+```
+
+```{r}
+all(rownames(recount.baseline.b) == baseline.covariate.df$barcode)
+```
+
+```{r}
+all(rownames(baseline.exprs) == baseline.covariate.df$barcode)
+```
+
+```{r}
+all(rownames(rtx.baseline.b) == baseline.covariate.df$barcode)
+```
+
+
+### Prediction
+
+```{r}
+set.seed(12345)
+```
+
+
+#### Expression data
+
+```{r}
+exprs.results <- glmnet::cv.glmnet(x = baseline.exprs,
+                                   y = baseline.covariate.df$mainclass,
+                                   type.measure = "class",
+                                   family = "multinomial",
+                                   nfolds = nrow(baseline.exprs))  # LOOCV
+saveRDS(exprs.results, file.path(results.dir, "expression_cv.glmnet.RDS"))
+```
+
+```{r}
+exprs.predicted.labels <- stats::predict(exprs.results, 
+                                         baseline.exprs,
+                                         s = exprs.results$lambda.1se,
+                                         type = "class")
+caret::confusionMatrix(data = as.factor(exprs.predicted.labels), 
+                       reference = as.factor(baseline.covariate.df$mainclass))
+```
+
+#### recount2 `B`
+
+```{r}
+recount.b.results <- glmnet::cv.glmnet(x = recount.baseline.b,
+                                       y = baseline.covariate.df$mainclass,
+                                       type.measure = "class",
+                                       family = "multinomial",
+                                       nfolds = nrow(recount.baseline.b))  # LOOCV
+saveRDS(recount.b.results, file.path(results.dir, "recount2_B_cv.glmnet.RDS"))
+```
+
+```{r}
+recount.b.predicted.labels <- stats::predict(recount.b.results, 
+                                             recount.baseline.b, 
+                                             s = recount.b.results$lambda.1se,
+                                             type = "class")
+caret::confusionMatrix(data = as.factor(recount.b.predicted.labels), 
+                       reference = as.factor(baseline.covariate.df$mainclass))
+```
+
+#### RTX `B`
+
+```{r}
+rtx.b.results <- glmnet::cv.glmnet(x = rtx.baseline.b,
+                                   y = baseline.covariate.df$mainclass,
+                                   type.measure = "class",
+                                   family = "multinomial",
+                                   nfolds = nrow(rtx.baseline.b))  # LOOCV
+saveRDS(rtx.b.results, file.path(results.dir, "RTX_B_cv.glmnet.RDS"))
+```
+
+```{r}
+rtx.b.predicted.labels <- stats::predict(rtx.b.results, 
+                                         rtx.baseline.b, 
+                                         s = rtx.b.results$lambda.1se,
+                                         type = "class")
+caret::confusionMatrix(data = as.factor(rtx.b.predicted.labels), 
+                       reference = as.factor(baseline.covariate.df$mainclass))
+```
+
+### Plotting accuracy
+
+```{r}
+acc.df <- data.frame(Model = c("Expression", "RTX LVs", "multiPLIER LVs"), 
+                     Accuracy = c(0.9444, 1, 0.3889), 
+                     Lower = c(0.8134, 0.9026, 0.2314), 
+                     Upper = c(0.9932, 1, 0.5654))
+```
+
+```{r}
+acc.df %>%
+  ggplot2::ggplot() + 
+  ggplot2::geom_pointrange(mapping = ggplot2::aes(x = Model, y = Accuracy, 
+                                                  ymin = Lower, ymax = Upper)) + 
+  ggplot2::theme_bw() +
+  ggplot2::labs(title = "Predicting response with LASSO") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold")) +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
+```
+
+```{r}
+ggplot2::ggsave(file.path(plot.dir, "total_accuracy_CI.pdf"),
+                plot = ggplot2::last_plot())
+```
+
+I wonder if the poor performance in the case of the multiPLIER LVs could be due
+to a smaller range of values. 
+
+```{r}
+summary(as.vector(baseline.exprs))
+```
+
+```{r}
+summary(as.vector(recount.baseline.b))
+```
+
+```{r}
+summary(as.vector(rtx.baseline.b))
+```
