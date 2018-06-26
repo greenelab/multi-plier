@@ -196,8 +196,10 @@ gplots::heatmap.2(cor.map.mat,
                   cellnote = round(x = cor.map.mat, 2), notecol = "#000000",
                   notecex = 0.5, margins = c(5, 9),
                   cexCol = 0.75, cexRow = 0.7,
-                  RowSideColors = row.color.bar)
-legend("topright", 
+                  RowSideColors = row.color.bar, key = FALSE,
+                  labRow = sub("nares", "NARES ", rownames(cor.map.mat)),
+                  labCol = c("Z", "B"))
+legend("topleft", 
        legend = c("significant"),
        col = c("#0000FF"), cex = 0.75,
        lty = 1, lwd = 6)
@@ -205,15 +207,18 @@ legend("topright",
 
 ```{r}
 # save plot to file
-pdf(file.path(plot.dir, "NARES_Z_B_correlation_heatmap.pdf"))
+pdf(file.path(plot.dir, "NARES_Z_B_correlation_heatmap.pdf"), width = 5,
+    height = 7)
 gplots::heatmap.2(cor.map.mat,
                   Rowv = NA, Colv = NA, trace = "none", dendrogram = "none",
                   col = colorRampPalette(colors = c("#FFFFFF", "#FF0000")),
                   cellnote = round(x = cor.map.mat, 2), notecol = "#000000",
-                  notecex = 0.6, margins = c(5, 9),
+                  notecex = 0.5, margins = c(5, 9),
                   cexCol = 0.75, cexRow = 0.7,
-                  RowSideColors = row.color.bar)
-legend("topright", 
+                  RowSideColors = row.color.bar, key = FALSE,
+                  labRow = sub("nares", "NARES ", rownames(cor.map.mat)),
+                  labCol = c("Z", "B"))
+legend("topleft", 
        legend = c("significant"),
        col = c("#0000FF"), cex = 0.75,
        lty = 1, lwd = 6)
