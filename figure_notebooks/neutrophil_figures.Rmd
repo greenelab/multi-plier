@@ -1,0 +1,115 @@
+---
+title: "Tweaking display items: Neutrophil scatterplots"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+A multi-panel figure for the neutrophil scatterplots in 
+`07-sle_cell_type_recount2_model` and `14-NARES_MCPcounter`
+
+## Set up 
+
+```{r setup}
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+```
+
+## Plotting
+
+```{r}
+LVScatter <- function(neutro.df, lv, rsq, x.label, plot.title, plot.subtitle, 
+                      y.var = "Neutrophil.Count", 
+                      y.label = "Neutrophil Count",
+                      count.data = TRUE) {
+
+  p <- ggplot2::ggplot(neutro.df, ggplot2::aes_string(x = lv, y = y.var)) +
+    ggplot2::geom_point(alpha = 0.7) +
+    ggplot2::geom_smooth(method = "lm") +
+    ggplot2::theme_bw() +
+    ggplot2::labs(x = x.label,
+                  y = y.label,
+                  title = plot.title,
+                  subtitle = plot.subtitle) +
+    ggplot2::theme(legend.position = "none", 
+                   text = ggplot2::element_text(size = 15),
+                   plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"),
+                   plot.subtitle = ggplot2::element_text(hjust = 0.5))
+  
+  if (count.data) {
+    # calculate where to put the r-squared value
+    x.range <- max(neutro.df[, lv]) - min(neutro.df[, lv])
+    x.coord <- min(neutro.df[, lv]) + (x.range * 0.175)
+    y.range <- max(neutro.df[, y.var]) - min(neutro.df[, y.var])
+    y.coord <- max(neutro.df[, y.var]) - (y.range * 0.175)
+    
+    p + ggplot2::annotate("text", x = x.coord, y = y.coord, 
+                          label = paste("r-squared =", rsq), size = 3.6)
+  } else {
+    return(p)
+  }
+}
+```
+
+
+### SLE whole blood
+
+```{r}
+sle.file <- file.path("results", "07", 
+                      "neutrophil_count_LV_both_models.tsv")
+sle.df <- readr::read_tsv(sle.file) %>%
+  dplyr::select(c("Sample", "LV87", "recount2_LV603", "Neutrophil.Count"))
+```
+
+```{r}
+sle.p <- LVScatter(neutro.df = sle.df, lv = "LV87", rsq = "0.29", 
+                   x.label = "SLE WB LV87",
+                   plot.title = "SLE WB PLIER", 
+                   plot.subtitle = "SLE WB Compendium")
+```
+
+```{r}
+recount.p <- LVScatter(neutro.df = sle.df, lv = "recount2_LV603", rsq = "0.36", 
+                       x.label = "recount2 LV603",
+                       plot.title = "multiPLIER", 
+                       plot.subtitle = "SLE WB Compendium")
+```
+
+### NARES
+
+```{r}
+nares.file <- file.path("results", "14", "NARES_neutrophil_LV_mcp_all.tsv")
+nares.df <- readr::read_tsv(nares.file) %>%
+  dplyr::select(c("Sample", "MCP_estimate", "recount_LV603"))
+```
+
+```{r}
+nares.p <- LVScatter(neutro.df = nares.df, lv = "recount_LV603", rsq = 0.90, 
+                     x.label = "recount2 LV603", plot.title = "multiPLIER",
+                     plot.subtitle = "NARES Nasal Brushings", 
+                     y.var = "MCP_estimate", 
+                     y.label = "MCPcounter neutrophil estimate",
+                     count.data = FALSE) +
+      ggplot2::annotate("text", x = -0.05222085, y = 2.535, 
+                       label = paste("r-squared =", 0.90), size = 3.6)
+```
+
+```{r}
+p <- cowplot::plot_grid(sle.p, recount.p, nares.p, ncol = 3, scale = 0.95,
+                   align = "h", labels = "AUTO")
+ggplot2::ggsave(file.path(plot.dir, "neutrophil_scatterplots.pdf"), plot = p,
+                          width = 12, height = 4)
+```
+
+
