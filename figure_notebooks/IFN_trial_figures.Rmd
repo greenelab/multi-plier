@@ -1,0 +1,286 @@
+---
+title: "Tweaking display items: IFN trial figures"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+We'll use a series of notebooks, separate from the analysis notebooks, to
+tweak display items.
+In this notebook, I'll work with the IFN-K trial data.
+Specifically, I will replot the baseline data based on 4 groups 
+and a single panel looking at the change of expression during treatment 
+(at day 112) in whichever module or LV is most representative of Type I 
+signaling based on the Chiche, et al. paper or the LV with the highest AUC for 
+`REACTOME_INTERFERON_ALPHA_BETA_SIGNALING` (see `08-identify_ifn_LVs`).
+
+## Install `ggsignif`
+
+```{r}
+# devtools::install_url("https://cran.r-project.org/src/contrib/ggsignif_0.4.0.tar.gz")
+```
+
+## Set up
+
+```{r setup}
+# we're setting this to the top level directory for this project because
+# we'll need to access the data and results directories
+# the rationale is to keep the notebooks required for tweaking figures separate
+# from the analysis notebooks
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+dir.create(plot.dir, showWarnings = FALSE, recursive = TRUE)
+```
+
+## Plot functions
+
+```{r}
+# intended to be used in this environment only
+# Baseline figure
+BaselinePlot <- function(df,
+                         y.var = "Value",
+                         facet.formula = "~ LV",
+                         y.label = "LV expression") {
+  # df: data.frame from 09-sle_ifn_data_prep
+  # y.var: name of y variable passed to ggplot2::aes_string
+  # facet.formula: passed to ggplot2::facet_grid
+  # y.label: y-axis label
+  ggplot2::ggplot(df,
+                  ggplot2::aes(interaction(`Disease state`, `IFN-level`),
+                                      colour = `IFN-level`)) +
+    ggplot2::geom_jitter(ggplot2::aes_string(y = y.var), width = 0.2) + 
+    ggplot2::stat_summary(ggplot2::aes_string(y = y.var),
+                          fun.y = "median", size = 4, shape = 18,
+                          geom = "point", color = "black", alpha = 0.7) +
+    ggplot2::facet_grid(as.formula(facet.formula)) +
+    ggplot2::theme_bw() + 
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+                   text = ggplot2::element_text(size = 15),
+                   legend.position = "none",
+                   plot.margin = ggplot2::margin(t = 5, r = 50, b = 5, l = 5, 
+                                                 unit = "pt"),
+                   plot.title = ggplot2::element_text(hjust = 0.5)) +
+    ggplot2::labs(y = y.label,
+                  title = "Baseline") +
+    ggplot2::scale_colour_manual(values = c("#5C5C5C", "#8073ac", 
+                                            "#e08214", "#969696"))
+}
+
+# Day 112 plot (one variable -- module or LV)
+Day112Plot <- function(df,
+                       filt.var = NULL,
+                       y.limit = c(-0.4, 0.4),
+                       y.label = "change in LV") {
+  # df: data.frame from 10-sle_ifn_analysis
+  # filt.var: name of the variable that was used to filter, used for title only
+  # y.limit: y-axis limits passed to ggplot2::ylim
+  # y.label: y-axis label
+  df %>%
+    dplyr::mutate(`IFN-level` = factor(`IFN-level`, 
+                                       levels = c("Placebo", "IFN-positive",
+                                                  "IFN-negative"))) %>%
+    ggplot2::ggplot(ggplot2::aes(x = `IFN-level`, y = `Change`, 
+                                 colour = `IFN-level`)) +
+    ggplot2::geom_boxplot() + 
+    ggplot2::geom_jitter(alpha = 0.5, width = 0.2) +
+    ggplot2::theme_bw() + 
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+                   legend.position = "none", 
+                   text = ggplot2::element_text(size = 15),
+                   plot.margin = ggplot2::margin(5, 25, 5, 5),
+                   plot.title = ggplot2::element_text(hjust = 0.5)) +
+    ggplot2::ylim(y.limit) +
+    ggplot2::labs(y = y.label,
+                  title = paste(filt.var, "Day 112 of IFN-K treatment")) +
+    ggplot2::scale_color_manual(values = c("#969696", "#e08214", "#8073ac")) +
+    ggsignif::geom_signif(comparisons = list(c("Placebo", "IFN-positive")),
+                          color = "#000000")
+}
+```
+
+## multiPLIER
+
+```{r}
+b.file <- file.path("results", "09", "E-GEOD-39088_recount2_PLIER_IFN_B.tsv")
+b.df <- readr::read_tsv(b.file)
+```
+
+```{r}
+baseline.p <- b.df %>%
+  dplyr::filter(!Day %in% c("day 112", "day 168"),
+                Group != "Control, stimulated") %>%
+  dplyr::mutate(`IFN-level` = 
+                  dplyr::if_else(`Disease state` == "healthy", 
+                                 true = "Control", 
+                                 false = `IFN-level`),
+                LV = 
+                  dplyr::case_when(
+                    LV == "LV116" ~ "LV116 Type I",
+                    LV == "LV140" ~ "LV140 Type II")
+                ) %>%
+  BaselinePlot()
+baseline.p
+```
+
+```{r}
+lv.change.file <- file.path("results", "10", 
+                            "E-GEOD-39088_IFNk_recount2_PLIER_change.tsv")
+lv.change.df <- readr::read_tsv(lv.change.file)
+```
+
+`LV116` has the highest AUC (`AUC = 0.937`) for IFN-alpha/beta signaling 
+in this model.
+
+```{r}
+lv116.p <- lv.change.df %>%
+  dplyr::filter(LV == "LV116",
+                Day == "day 112") %>%
+  Day112Plot(filt.var = "LV116", y.limit = c(-0.25, 0.25))
+lv116.p
+```
+
+```{r}
+p <- cowplot::plot_grid(baseline.p, lv116.p, align = "h", axis = "b", 
+                        rel_widths = c(1.5, 1), labels = c("A", "B"))
+p.title <- cowplot::ggdraw() + 
+  cowplot::draw_label("multiPLIER", fontface = "bold",
+                      size = 20)
+multi.p <- cowplot::plot_grid(p.title, p, ncol = 1, rel_heights = c(0.1, 1))
+ggplot2::ggsave(file.path(plot.dir, "IFN-K_main.pdf"), plot = multi.p, 
+                          width = 11, height = 6)
+```
+
+```{r}
+rm(b.df, lv.change.df, lv116.p, baseline.p, p, p.title)
+```
+
+## Modular framework
+
+First, we'll take a look at the IFN-K trial.
+
+```{r}
+mod.file <- file.path("results", "09", "E-GEOD-39088_Chiche_et_al_module.tsv")
+mod.df <- readr::read_tsv(mod.file)
+```
+
+```{r}
+baseline.p <- mod.df %>%
+  dplyr::filter(!Day %in% c("day 112", "day 168"),
+                Group != "Control, stimulated") %>%
+  dplyr::mutate(`IFN-level` = 
+                  dplyr::if_else(`Disease state` == "healthy", 
+                                 true = "Control", 
+                                 false = `IFN-level`),
+                Module = 
+                  dplyr::case_when(
+                    Module == "M1.2" ~ "M1.2 Type I",
+                    Module == "M3.4" ~ "M3.4 Types I/II",
+                    Module == "M5.12" ~ "M5.12 Types I/II")
+                ) %>%
+ BaselinePlot(y.var = "Summary", facet.formula = "~ Module", 
+              y.label = "expression summary")
+baseline.p
+```
+
+We'll analyze the differences between IFN-positive and Placebo groups change in 
+`M1.2` expression on `day 112` further.
+
+```{r}
+mod.change.file <- file.path("results", "10", 
+                             "E-GEOD-39088_IFNk_Chiche_modules_change.tsv")
+mod.change.df <- readr::read_tsv(mod.change.file)
+```
+
+```{r}
+m1.p <- mod.change.df %>%
+  dplyr::filter(Module == "M1.2",
+                Day == "day 112") %>%
+  Day112Plot(filt.var = "M1.2", y.limit = c(-0.35, 0.35), 
+             y.label = "change in summary")
+m1.p
+```
+
+
+```{r}
+p <- cowplot::plot_grid(baseline.p, m1.p, align = "h", axis = "b", 
+                        rel_widths = c(1.5, 1), labels = c("A", "B"))
+p.title <- cowplot::ggdraw() + 
+  cowplot::draw_label("Whole Blood Modular Framework", fontface = "bold",
+                      size = 20)
+mod.p <- cowplot::plot_grid(p.title, p, ncol = 1, rel_heights = c(0.1, 1))
+```
+
+```{r}
+rm(baseline.p, p, p.title, m1.p)
+```
+
+
+## SLE WB PLIER
+
+```{r}
+b.file <- file.path("results", "09", "E-GEOD-39088_SLE-WB_PLIER_IFN_B.tsv")
+b.df <- readr::read_tsv(b.file)
+```
+
+```{r}
+baseline.p <- b.df %>%
+  dplyr::filter(!Day %in% c("day 112", "day 168"),
+                Group != "Control, stimulated") %>%
+  dplyr::mutate(`IFN-level` = 
+                  dplyr::if_else(`Disease state` == "healthy", 
+                                 true = "Control", 
+                                 false = `IFN-level`),
+                LV = 
+                  dplyr::case_when(
+                    LV == "LV6" ~ "LV6 Type I",
+                    LV == "LV69" ~ "LV69 Type I",
+                    LV == "LV110" ~ "LV110 Type I")
+                ) %>%
+  dplyr::mutate(LV = factor(LV, levels = c("LV6 Type I", "LV69 Type I",
+                                           "LV110 Type I"))) %>%
+  BaselinePlot()
+baseline.p
+```
+
+```{r}
+lv.change.file <- file.path("results", "10", 
+                            "E-GEOD-39088_IFNk_SLE_PLIER_change.tsv")
+lv.change.df <- readr::read_tsv(lv.change.file)
+```
+
+`LV6` from this model has highest AUC (`AUC = 0.973`) for IFN-alpha/beta 
+signaling.
+
+```{r}
+lv6.p <- lv.change.df %>%
+  dplyr::filter(LV == "LV6",
+                Day == "day 112") %>%
+ Day112Plot(filt.var = "LV6")
+lv6.p
+```
+
+```{r}
+p <- cowplot::plot_grid(baseline.p, lv6.p, align = "h", axis = "b", 
+                        rel_widths = c(1.5, 1), labels = c("C", "D"))
+p.title <- cowplot::ggdraw() + 
+  cowplot::draw_label("SLE WB PLIER", fontface = "bold",
+                      size = 20)
+sle.p <- cowplot::plot_grid(p.title, p, ncol = 1, rel_heights = c(0.1, 1))
+```
+
+```{r}
+supp.p <- cowplot::plot_grid(mod.p, sle.p, ncol = 1, scale = 0.9)
+ggplot2::ggsave(file.path(plot.dir, "IFN-K_supplemental.pdf"), plot = supp.p,
+                width = 11, height = 11)
+```
+
