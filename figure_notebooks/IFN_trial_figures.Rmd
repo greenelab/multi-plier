@@ -10,12 +10,7 @@ output:
 
 We'll use a series of notebooks, separate from the analysis notebooks, to
 tweak display items.
-In this notebook, I'll work with the IFN-K trial data.
-Specifically, I will replot the baseline data based on 4 groups 
-and a single panel looking at the change of expression during treatment 
-(at day 112) in whichever module or LV is most representative of Type I 
-signaling based on the Chiche, et al. paper or the LV with the highest AUC for 
-`REACTOME_INTERFERON_ALPHA_BETA_SIGNALING` (see `08-identify_ifn_LVs`).
+In this notebook, I'll work with the IFN trial data.
 
 ## Install `ggsignif`
 
@@ -42,7 +37,16 @@ plot.dir <- file.path("figure_notebooks", "figures")
 dir.create(plot.dir, showWarnings = FALSE, recursive = TRUE)
 ```
 
-## Plot functions
+## IFN-K trial
+
+For the IFN-K trial, I will replot the baseline data based on 4 groups --
+IFN-positive, IFN-negative, Placebo, and healthy control -- and a single panel 
+looking at the change of expression during treatment (at day 112) in whichever 
+module or LV is most representative of Type I signaling based on the Chiche, et 
+al. paper or the LV with the highest AUC for 
+`REACTOME_INTERFERON_ALPHA_BETA_SIGNALING` (see `08-identify_ifn_LVs`).
+
+### Plot functions
 
 ```{r}
 # intended to be used in this environment only
@@ -281,5 +285,114 @@ sle.p <- cowplot::plot_grid(p.title, p, ncol = 1, rel_heights = c(0.1, 1))
 supp.p <- cowplot::plot_grid(mod.p, sle.p, ncol = 1, scale = 0.9)
 ggplot2::ggsave(file.path(plot.dir, "IFN-K_supplemental.pdf"), plot = supp.p,
                 width = 11, height = 11)
+```
+
+```{r}
+rm(list = setdiff(ls(), c("%>%", "plot.dir")))
+```
+
+
+## AMG 811 Trial
+
+This is the trial where we expect Type II interferon to be perturbed.
+
+### Plotting function
+
+```{r}
+PlotInteraction <- function(df, plot.title, y.var = "Value", wrap.var = "LV",
+                            y.label = "LV value") {
+  ggplot2::ggplot(df, 
+                  ggplot2::aes(x = interaction(`Disease state`, `Day`), 
+                               fill = interaction(`Disease state`, `Day`))) + 
+    ggplot2::geom_boxplot(ggplot2::aes_string(y = y.var)) + 
+    ggplot2::geom_point(ggplot2::aes_string(y = y.var),
+                        alpha = 0.3, position = "jitter") +
+    ggplot2::facet_wrap(as.formula(paste("~", wrap.var))) +
+    ggplot2::theme_bw() + 
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+                   legend.position = "none",
+                   text = ggplot2::element_text(size = 15),
+                   plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                      face = "bold"),
+                   plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
+    ggplot2::labs(x = "interaction(Disease state, Day)",
+                  y = y.label,
+                  title = plot.title,
+                  subtitle = "Treatment with AMG 811") +
+    ggplot2::scale_fill_manual(values = c("seagreen3", "#deebf7", "#9ecae1",
+                                          "#3182bd", "white")) +
+    ggplot2::scale_x_discrete(labels = c("healthy", "SLE baseline", 
+                                         "SLE day 15", "SLE day 56", 
+                                         "SLE EOS")) +
+    ggsignif::geom_signif()
+}
+```
+
+### multiPLIER
+
+```{r}
+b.file <- file.path("results", "09", "E-GEOD-78193_recount2_PLIER_IFN_B.tsv")
+b.df <- readr::read_tsv(b.file)
+```
+
+```{r}
+multi.p <- b.df %>%
+  dplyr::mutate(LV = dplyr::case_when(
+    LV == "LV116" ~ "LV116 Type I",
+    LV == "LV140" ~ "LV140 Type II"
+  )) %>%
+  PlotInteraction(plot.title ="multiPLIER")
+```
+
+```{r}
+rm(b.file, b.df)
+```
+
+### Modular framework
+
+```{r}
+mod.file <- file.path("results", "09", "E-GEOD-78193_Chiche_et_al_module.tsv")
+mod.df <- readr::read_tsv(mod.file)
+```
+
+```{r}
+mod.p <- mod.df %>%
+  dplyr::mutate(Module = dplyr::case_when(
+    Module == "M1.2" ~ "M1.2 Type I",
+    Module == "M3.4" ~ "M3.4 Types I/II",
+    Module == "M5.12" ~ "M5.12 Types I/II"
+  )) %>%
+  PlotInteraction(plot.title = "Whole Blood Modular Framework", 
+                  y.var = "Summary", wrap.var = "Module", 
+                  y.label = "expression summary")
+```
+
+```{r}
+rm(mod.df, mod.file)
+```
+
+### SLE WB PLIER
+
+```{r}
+b.file <- file.path("results", "09", "E-GEOD-78193_SLE-WB_PLIER_IFN_B.tsv")
+b.df <- readr::read_tsv(b.file)
+```
+
+```{r}
+sle.p <- b.df %>%
+  dplyr::mutate(LV = dplyr::case_when(
+    LV == "LV6" ~ "LV6 Type I",
+    LV == "LV69" ~ "LV69 Type I",
+    LV == "LV110" ~ "LV110 Type I"
+  )) %>%
+  dplyr::mutate(LV = factor(LV, levels = c("LV6 Type I", "LV69 Type I", 
+                                           "LV110 Type I"))) %>%
+  PlotInteraction(plot.title = "SLE WB PLIER")
+```
+
+```{r}
+p <- cowplot::plot_grid(multi.p, mod.p, sle.p, nrow = 3, scale = 0.95)
+ggplot2::ggsave(file.path(plot.dir, "AMG811_supplemental.pdf"), width = 6, 
+                height = 14)
 ```
 
