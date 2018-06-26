@@ -70,10 +70,12 @@ BaselinePlot <- function(df,
                    plot.margin = ggplot2::margin(t = 5, r = 50, b = 5, l = 5, 
                                                  unit = "pt"),
                    plot.title = ggplot2::element_text(hjust = 0.5)) +
-    ggplot2::labs(y = y.label,
+    ggplot2::labs(x = "interaction(Disease state, IFN-level)", y = y.label,
                   title = "Baseline") +
     ggplot2::scale_colour_manual(values = c("#5C5C5C", "#8073ac", 
-                                            "#e08214", "#969696"))
+                                            "#e08214", "#969696")) +
+    ggplot2::scale_x_discrete(labels = c("Healthy control", "SLE IFN-negative",
+                                         "SLE IFN-positive", "SLE Placebo"))
 }
 
 # Day 112 plot (one variable -- module or LV)
@@ -86,9 +88,6 @@ Day112Plot <- function(df,
   # y.limit: y-axis limits passed to ggplot2::ylim
   # y.label: y-axis label
   df %>%
-    dplyr::mutate(`IFN-level` = factor(`IFN-level`, 
-                                       levels = c("Placebo", "IFN-positive",
-                                                  "IFN-negative"))) %>%
     ggplot2::ggplot(ggplot2::aes(x = `IFN-level`, y = `Change`, 
                                  colour = `IFN-level`)) +
     ggplot2::geom_boxplot() + 
@@ -102,13 +101,13 @@ Day112Plot <- function(df,
     ggplot2::ylim(y.limit) +
     ggplot2::labs(y = y.label,
                   title = paste(filt.var, "Day 112 of IFN-K treatment")) +
-    ggplot2::scale_color_manual(values = c("#969696", "#e08214", "#8073ac")) +
+    ggplot2::scale_color_manual(values = c("#8073ac", "#e08214", "#969696")) +
     ggsignif::geom_signif(comparisons = list(c("Placebo", "IFN-positive")),
                           color = "#000000")
 }
 ```
 
-## multiPLIER
+### multiPLIER
 
 ```{r}
 b.file <- file.path("results", "09", "E-GEOD-39088_recount2_PLIER_IFN_B.tsv")
@@ -164,7 +163,7 @@ ggplot2::ggsave(file.path(plot.dir, "IFN-K_main.pdf"), plot = multi.p,
 rm(b.df, lv.change.df, lv116.p, baseline.p, p, p.title)
 ```
 
-## Modular framework
+### Modular framework
 
 First, we'll take a look at the IFN-K trial.
 
@@ -187,8 +186,8 @@ baseline.p <- mod.df %>%
                     Module == "M3.4" ~ "M3.4 Types I/II",
                     Module == "M5.12" ~ "M5.12 Types I/II")
                 ) %>%
- BaselinePlot(y.var = "Summary", facet.formula = "~ Module", 
-              y.label = "expression summary")
+  BaselinePlot(y.var = "Summary", facet.formula = "~ Module", 
+               y.label = "expression summary")
 baseline.p
 ```
 
@@ -225,7 +224,7 @@ rm(baseline.p, p, p.title, m1.p)
 ```
 
 
-## SLE WB PLIER
+### SLE WB PLIER
 
 ```{r}
 b.file <- file.path("results", "09", "E-GEOD-39088_SLE-WB_PLIER_IFN_B.tsv")
@@ -265,7 +264,7 @@ signaling.
 lv6.p <- lv.change.df %>%
   dplyr::filter(LV == "LV6",
                 Day == "day 112") %>%
- Day112Plot(filt.var = "LV6")
+  Day112Plot(filt.var = "LV6")
 lv6.p
 ```
 
