@@ -1,0 +1,41 @@
+model	pathway_coverage_type	value	training_set
+SLE-WB_PLIER_2876	pathway coverage	0.2229299363057325	SLE
+SLE-WB_PLIER_2876	LV associated with pathways	0.425	SLE
+SLE-WB_PLIER_7883	pathway coverage	0.19904458598726116	SLE
+SLE-WB_PLIER_7883	LV associated with pathways	0.4527027027027027	SLE
+SLE-WB_PLIER_4089	pathway coverage	0.21656050955414013	SLE
+SLE-WB_PLIER_4089	LV associated with pathways	0.44594594594594594	SLE
+SLE-WB_PLIER_8828	pathway coverage	0.2070063694267516	SLE
+SLE-WB_PLIER_8828	LV associated with pathways	0.4797297297297297	SLE
+SLE-WB_PLIER_9401	pathway coverage	0.23089171974522293	SLE
+SLE-WB_PLIER_9401	LV associated with pathways	0.4875	SLE
+SLE-WB_PLIER_456	pathway coverage	0.21019108280254778	SLE
+SLE-WB_PLIER_456	LV associated with pathways	0.4594594594594595	SLE
+SLE-WB_PLIER_5278	pathway coverage	0.21337579617834396	SLE
+SLE-WB_PLIER_5278	LV associated with pathways	0.45625	SLE
+SLE-WB_PLIER_8918	pathway coverage	0.20222929936305734	SLE
+SLE-WB_PLIER_8918	LV associated with pathways	0.46938775510204084	SLE
+SLE-WB_PLIER_5510	pathway coverage	0.18789808917197454	SLE
+SLE-WB_PLIER_5510	LV associated with pathways	0.43333333333333335	SLE
+SLE-WB_PLIER_4563	pathway coverage	0.18789808917197454	SLE
+SLE-WB_PLIER_4563	LV associated with pathways	0.47183098591549294	SLE
+recount2_subsampled_2876	pathway coverage	0.17834394904458598	recount2 subsampled
+recount2_subsampled_2876	LV associated with pathways	0.5535714285714286	recount2 subsampled
+recount2_subsampled_4089	pathway coverage	0.23885350318471338	recount2 subsampled
+recount2_subsampled_4089	LV associated with pathways	0.4752475247524752	recount2 subsampled
+recount2_subsampled_456	pathway coverage	0.21656050955414013	recount2 subsampled
+recount2_subsampled_456	LV associated with pathways	0.5180722891566265	recount2 subsampled
+recount2_subsampled_4563	pathway coverage	0.2372611464968153	recount2 subsampled
+recount2_subsampled_4563	LV associated with pathways	0.5	recount2 subsampled
+recount2_subsampled_5278	pathway coverage	0.20222929936305734	recount2 subsampled
+recount2_subsampled_5278	LV associated with pathways	0.5060240963855421	recount2 subsampled
+recount2_subsampled_5510	pathway coverage	0.22452229299363058	recount2 subsampled
+recount2_subsampled_5510	LV associated with pathways	0.5148514851485149	recount2 subsampled
+recount2_subsampled_7883	pathway coverage	0.2197452229299363	recount2 subsampled
+recount2_subsampled_7883	LV associated with pathways	0.5543478260869565	recount2 subsampled
+recount2_subsampled_8828	pathway coverage	0.16401273885350318	recount2 subsampled
+recount2_subsampled_8828	LV associated with pathways	0.6046511627906976	recount2 subsampled
+recount2_subsampled_8918	pathway coverage	0.18949044585987262	recount2 subsampled
+recount2_subsampled_8918	LV associated with pathways	0.5333333333333333	recount2 subsampled
+recount2_subsampled_9401	pathway coverage	0.2054140127388535	recount2 subsampled
+recount2_subsampled_9401	LV associated with pathways	0.5121951219512195	recount2 subsampled

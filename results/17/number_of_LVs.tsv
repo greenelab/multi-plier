@@ -1,0 +1,21 @@
+model	num_lvs	training_set
+SLE-WB_PLIER_2876	160	SLE
+SLE-WB_PLIER_7883	148	SLE
+SLE-WB_PLIER_4089	148	SLE
+SLE-WB_PLIER_8828	148	SLE
+SLE-WB_PLIER_9401	160	SLE
+SLE-WB_PLIER_456	148	SLE
+SLE-WB_PLIER_5278	160	SLE
+SLE-WB_PLIER_8918	147	SLE
+SLE-WB_PLIER_5510	150	SLE
+SLE-WB_PLIER_4563	142	SLE
+recount2_subsampled_2876	56	recount2 subsampled
+recount2_subsampled_4089	101	recount2 subsampled
+recount2_subsampled_456	83	recount2 subsampled
+recount2_subsampled_4563	94	recount2 subsampled
+recount2_subsampled_5278	83	recount2 subsampled
+recount2_subsampled_5510	101	recount2 subsampled
+recount2_subsampled_7883	92	recount2 subsampled
+recount2_subsampled_8828	43	recount2 subsampled
+recount2_subsampled_8918	75	recount2 subsampled
+recount2_subsampled_9401	82	recount2 subsampled

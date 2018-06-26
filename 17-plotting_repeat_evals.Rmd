@@ -69,6 +69,14 @@ rm(sle.num.lvs, sle.pathway, sle.sparsity, recount.num.lvs, recount.pathway,
      recount.sparsity)
 ```
 
+Write number of LVs `data.frame` to file
+
+```{r}
+# number of latent variables
+num.lvs.file <- file.path(results.dir, "number_of_LVs.tsv")
+readr::write_tsv(num.lvs.df, num.lvs.file)
+```
+
 ## Plotting
 
 #### Number of latent variables
@@ -94,13 +102,20 @@ ggplot2::ggsave(plot.file, plot = ggplot2::last_plot())
 #### Pathway coverage
 
 ```{r}
-pathway.df %>%
+pathway.df <- pathway.df %>%
   dplyr::filter(pathway_coverage_type != "sig.pathway.by.lv") %>%
   dplyr::mutate(pathway_coverage_type = 
                   dplyr::case_when(
-                    (pathway_coverage_type == "lv") ~ "LV associated with pathways",
+                    (pathway_coverage_type == "lv") ~ 
+                      "LV associated with pathways",
                     (pathway_coverage_type =="pathway") ~ "pathway coverage"
-                  )) %>%
+                  ))
+
+# pathway coverage
+pathway.file <- file.path(results.dir, "pathway_coverage.tsv")
+readr::write_tsv(pathway.df, pathway.file)
+
+pathway.df %>%
   ggplot2::ggplot(ggplot2::aes(x = training_set, y = value)) +
   ggplot2::geom_boxplot() +
   ggplot2::geom_point(position = ggplot2::position_jitter(0.2),
