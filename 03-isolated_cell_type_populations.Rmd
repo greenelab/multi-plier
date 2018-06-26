@@ -113,12 +113,19 @@ col.colors.vec[grep("CD16", colnames(iso.b.matrix))] <- "#32CD32"
 
 # heatmap
 gplots::heatmap.2(iso.b.matrix[indx.relevant.lv, ], 
-                        trace = "none",
-                        col = colorRampPalette(c("blue", "white", "red")),
-                        cexCol = 0.5, cexRow = 0.6,
-                        RowSideColors = row.colors.vec,
-                        ColSideColors = col.colors.vec,
-                        margins = c(6, 10))
+                  trace = "none",
+                  col = colorRampPalette(c("blue", "white", "red")),
+                  labCol = FALSE, cexRow = 0.75,
+                  RowSideColors = row.colors.vec,
+                  ColSideColors = col.colors.vec,
+                  density.info = "none",
+                  margins = c(2.5, 14),
+                  main = "Isolated cell populations\nmicroarray",
+                  ylab = "recount2 LVs",
+                  xlab = "Samples", 
+                  colsep = 0:ncol(iso.b.matrix), 
+                  rowsep = 0:length(indx.relevant.lv), 
+                  sepcolor = "#666666", sepwidth = c(0.001, 0.001))
 legend("topright", 
        legend = c("CD4 T cell", "CD14, monocyte", "CD16, neutrophil"),
        col = c("#1E90EF", "#000000", "#32CD32"), cex = 0.5,
@@ -127,14 +134,22 @@ legend("topright",
 ```{r}
 # save heatmap as pdf -- can not figure out another way around this, hm just
 # returns a list
-pdf(file.path(plot.dir, "E-MTAB-2452_recount_PLIER_cell_type_LVs_B.pdf"))
+pdf(file.path(plot.dir, "E-MTAB-2452_recount_PLIER_cell_type_LVs_B.pdf"),
+    width = 7, height = 5)
 gplots::heatmap.2(iso.b.matrix[indx.relevant.lv, ], 
-                        trace = "none",
-                        col = colorRampPalette(c("blue", "white", "red")),
-                        cexCol = 0.5, cexRow = 0.6,
-                        RowSideColors = row.colors.vec,
-                        ColSideColors = col.colors.vec,
-                        margins = c(6, 10))
+                  trace = "none",
+                  col = colorRampPalette(c("blue", "white", "red")),
+                  labCol = FALSE, cexRow = 0.75,
+                  RowSideColors = row.colors.vec,
+                  ColSideColors = col.colors.vec,
+                  density.info = "none",
+                  margins = c(2.5, 14),
+                  main = "Isolated cell populations\nmicroarray",
+                  ylab = "recount2 LVs",
+                  xlab = "Samples", 
+                  colsep = 0:ncol(iso.b.matrix), 
+                  rowsep = 0:length(indx.relevant.lv), 
+                  sepcolor = "#666666", sepwidth = c(0.001, 0.001))
 legend("topright", 
        legend = c("CD4 T cell", "CD14, monocyte", "CD16, neutrophil"),
        col = c("#1E90EF", "#000000", "#32CD32"), cex = 0.5,
