@@ -116,7 +116,8 @@ bar.p <- ggplot2::ggplot(top.z.df,
   ggplot2::coord_flip() +
   ggplot2::labs(title = "recount2 LV 599 Loadings", fill = "ANCA antigen") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
-                                                    face = "bold"))
+                                                    face = "bold"),
+                 axis.text.y = ggplot2::element_text(size = 7))
 ```
 
 ```{r}
