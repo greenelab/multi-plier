@@ -1,0 +1,84 @@
+---
+title: "Tweaking display items: Plasma cell figures"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+## Set up 
+
+```{r setup}
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+```
+
+## Plotting
+
+```{r}
+plasma.file <- file.path("results", "07", "plasma_cell_LVs_both_models.tsv")
+plasma.df <- readr::read_tsv(plasma.file)
+```
+
+We'll use the pairwise t-test p-values calculated in `06-sle-wb_cell_type` and `07-sle_cell_type_recount2_model` to label these plots
+
+```{r}
+sle.plot <- plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = LV52)) +
+  ggplot2::geom_boxplot() +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity",
+                y = "SLE WB LV52",
+                title = "SLE WB PLIER",
+                subtitle = "SLE WB Compendium") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"),
+                 plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
+  ggplot2::theme(text = ggplot2::element_text(size = 15)) +
+  ggplot2::ylim(-0.25, 1.75) +
+  ggsignif::geom_signif(xmin = c("DA1", "DA1", "DA2"), 
+                        xmax = c("DA2", "DA3", "DA3"), 
+                        annotations = c("0.012", "<2e-16", "6.5e-08"), 
+                        y_position = c(1.3, 1.7, 1.5),
+                        tip_length = 0)
+```
+
+```{r}
+recount.plot <- plasma.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
+                               y = recount2_LV951)) +
+  ggplot2::geom_boxplot() +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "Disease Activity",
+                y = "recount2 LV951",
+                title = "multiPLIER",
+                subtitle = "SLE WB Compendium") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"),
+                 plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
+  ggplot2::theme(text = ggplot2::element_text(size = 15)) +
+  ggplot2::ylim(-0.15, 0.45) +
+  ggsignif::geom_signif(y_position = c(0.31, 0.4, 0.35), 
+                        xmin = c("DA1", "DA1", "DA2"), 
+                        xmax = c("DA2", "DA3", "DA3"),
+                        annotation = c("0.047", "5.0e-13", "2.3e-06"), 
+                        tip_length = 0) 
+```
+
+```{r}
+p <- cowplot::plot_grid(sle.plot, recount.plot, nrow = 1, scale = 0.95, 
+                        labels = "AUTO")
+ggplot2::ggsave(file.path(plot.dir, "plasma_cell_LV_figure.pdf"), plot = p,
+                width = 7.5, height = 4.5)
+```
+
