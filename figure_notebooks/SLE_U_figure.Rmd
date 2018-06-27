@@ -1,0 +1,41 @@
+---
+title: "Tweaking display items: SLE U plot"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+## Set up 
+
+```{r setup}
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+library(PLIER)
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+```
+
+## Plotting
+
+```{r}
+# read in SLE WB PLIER model
+plier.file <- file.path("results", "05", "SLE-WB_PLIER_model.RDS")
+sle.plier <- readRDS(plier.file)
+```
+
+```{r}
+pdf(file.path(plot.dir, "SLE_U_auc0.75_custom_col_index.pdf"))
+PLIER::plotU(sle.plier, auc.cutoff = 0.75, fontsize_row = 7,
+             fontsize_col = 7, indexCol = c(6, 69, 110, 87, 34, 2, 27, 122, 86,
+                                            25, 60, 52, 59, 109, 72, 8, 74))
+dev.off()
+```
+
