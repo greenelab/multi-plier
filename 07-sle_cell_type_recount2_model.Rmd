@@ -402,6 +402,11 @@ head(plasma.df)
 ```
 
 ```{r}
+plasma.file <- file.path(results.dir, "plasma_cell_LVs_both_models.tsv")
+readr::write_tsv(plasma.df, plasma.file)
+```
+
+```{r}
 plasma.df %>%
   ggplot2::ggplot(ggplot2::aes(x = Disease.Activity, 
                                y = recount2_LV951)) +
