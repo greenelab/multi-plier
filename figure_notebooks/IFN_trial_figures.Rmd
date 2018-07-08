@@ -272,6 +272,17 @@ lv6.p <- lv.change.df %>%
 lv6.p
 ```
 
+Let's check `LV110` for differential expression even though it may be better
+capturing another signal (e.g., macrophages).
+
+```{r}
+lv110.df <- lv.change.df %>%
+  dplyr::filter(LV == "LV110",
+                Day == "day 112",
+                `IFN-level` != "IFN-negative")
+wilcox.test(lv110.df$Change ~ lv110.df$Group)
+```
+
 ```{r}
 p <- cowplot::plot_grid(baseline.p, lv6.p, align = "h", axis = "b", 
                         rel_widths = c(1.5, 1), labels = c("C", "D"))
@@ -323,8 +334,7 @@ PlotInteraction <- function(df, plot.title, y.var = "Value", wrap.var = "LV",
                                           "#3182bd", "white")) +
     ggplot2::scale_x_discrete(labels = c("healthy", "SLE baseline", 
                                          "SLE day 15", "SLE day 56", 
-                                         "SLE EOS")) +
-    ggsignif::geom_signif()
+                                         "SLE EOS"))
 }
 ```
 
