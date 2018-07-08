@@ -61,7 +61,7 @@ recount.plot <- plasma.df %>%
   ggplot2::theme_bw() +
   ggplot2::labs(x = "Disease Activity",
                 y = "recount2 LV951",
-                title = "multiPLIER",
+                title = "MultiPLIER",
                 subtitle = "SLE WB Compendium") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
                                                     face = "bold"),
