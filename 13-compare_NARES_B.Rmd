@@ -259,7 +259,7 @@ b.cor.df %>%
   ggplot2::geom_point(ggplot2::aes(y = 0, colour = Significance),
                       shape = 15, size = 3, alpha = 0.7) +
   ggplot2::labs(title = "Latent Space Agreement",
-                subtitle = "NARES-multiPLIER correlation",
+                subtitle = "NARES-MultiPLIER correlation",
                 x = "Correlation") +
   ggplot2::theme(text = ggplot2::element_text(size = 15),
                  plot.title = ggplot2::element_text(hjust = 0.5, 
