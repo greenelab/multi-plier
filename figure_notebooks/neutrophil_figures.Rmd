@@ -82,7 +82,7 @@ sle.p <- LVScatter(neutro.df = sle.df, lv = "LV87", rsq = "0.29",
 ```{r}
 recount.p <- LVScatter(neutro.df = sle.df, lv = "recount2_LV603", rsq = "0.36", 
                        x.label = "recount2 LV603",
-                       plot.title = "multiPLIER", 
+                       plot.title = "MultiPLIER", 
                        plot.subtitle = "SLE WB Compendium")
 ```
 
@@ -96,7 +96,7 @@ nares.df <- readr::read_tsv(nares.file) %>%
 
 ```{r}
 nares.p <- LVScatter(neutro.df = nares.df, lv = "recount_LV603", rsq = 0.90, 
-                     x.label = "recount2 LV603", plot.title = "multiPLIER",
+                     x.label = "recount2 LV603", plot.title = "MultiPLIER",
                      plot.subtitle = "NARES Nasal Brushings", 
                      y.var = "MCP_estimate", 
                      y.label = "MCPcounter neutrophil estimate",
