@@ -51,7 +51,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 10], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 10], decreasing = TRUE))
 ```
 
 ### Explore LV53
@@ -63,7 +63,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 53], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 53], decreasing = TRUE))
 ```
 
 ### Explore LV63
@@ -75,7 +75,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 63], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 63], decreasing = TRUE))
 ```
 
 ### Explore LV524
@@ -94,7 +94,7 @@ Banchereau, et al. dataset when we analyzed it in
 Let's take a look at the genes contributing to this signal.
 
 ```{r}
-head(sort(recount.plier$Z[, 524], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 524], decreasing = TRUE))
 ```
 
 ### Explore LV624
@@ -106,7 +106,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 624], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 624], decreasing = TRUE))
 ```
 
 ### Explore LV937
@@ -118,7 +118,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 937], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 937], decreasing = TRUE))
 ```
 
 ## Downregulated
@@ -135,7 +135,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 139], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 139], decreasing = TRUE))
 ```
 
 ### Explore LV332
@@ -147,7 +147,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 332], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 332], decreasing = TRUE))
 ```
 
 ### Explore LV346
@@ -159,7 +159,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 346], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 346], decreasing = TRUE))
 ```
 
 ### Explore LV631
@@ -171,7 +171,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 631], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 631], decreasing = TRUE))
 ```
 
 ### Explore LV793
@@ -183,7 +183,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 793], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 793], decreasing = TRUE))
 ```
 
 ### Explore LV887
@@ -195,7 +195,7 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 887], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 887], decreasing = TRUE))
 ```
 
 ### Explore LV909
@@ -207,6 +207,6 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 909], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 909], decreasing = TRUE))
 ```
 
