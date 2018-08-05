@@ -121,7 +121,7 @@ b.df <- readr::read_tsv(b.file)
 ```{r}
 baseline.p <- b.df %>%
   dplyr::filter(!Day %in% c("day 112", "day 168"),
-                Group != "Control, stimulated") %>%
+                !Group %in% c("Control, stimulated", "Placebo")) %>%
   dplyr::mutate(`IFN-level` = 
                   dplyr::if_else(`Disease state` == "healthy", 
                                  true = "Control", 
@@ -179,7 +179,7 @@ mod.df <- readr::read_tsv(mod.file)
 ```{r}
 baseline.p <- mod.df %>%
   dplyr::filter(!Day %in% c("day 112", "day 168"),
-                Group != "Control, stimulated") %>%
+                !Group %in% c("Control, stimulated", "Placebo")) %>%
   dplyr::mutate(`IFN-level` = 
                   dplyr::if_else(`Disease state` == "healthy", 
                                  true = "Control", 
@@ -238,7 +238,7 @@ b.df <- readr::read_tsv(b.file)
 ```{r}
 baseline.p <- b.df %>%
   dplyr::filter(!Day %in% c("day 112", "day 168"),
-                Group != "Control, stimulated") %>%
+                !Group %in% c("Control, stimulated", "Placebo")) %>%
   dplyr::mutate(`IFN-level` = 
                   dplyr::if_else(`Disease state` == "healthy", 
                                  true = "Control", 
