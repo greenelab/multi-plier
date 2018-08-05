@@ -60,7 +60,7 @@ recount.plot <- plasma.df %>%
   ggplot2::geom_boxplot() +
   ggplot2::theme_bw() +
   ggplot2::labs(x = "Disease Activity",
-                y = "recount2 LV951",
+                y = "MultiPLIER LV951",
                 title = "MultiPLIER",
                 subtitle = "SLE WB Compendium") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
