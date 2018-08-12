@@ -8,8 +8,8 @@ output: html_notebook
 In `21-AAV_DLVE`, we identified LVs that are differentially expressed in all
 the ANCA-associated vasculitis datasets.
 In this notebook, we'll do exploratory analyses of some of the recount2 PLIER
-model LVs that look like they may be elevated in more severe or active AAV 
-except for `LV793` looks to be consistently downregulated.
+model LVs that look like they show consistent directionality across the 3
+tissues.
 
 ## Functions and directory set up
 
@@ -35,7 +35,12 @@ recount.plier <- readRDS(file.path("data", "recount2_PLIER_data",
                                    "recount_PLIER_model.RDS"))
 ```
 
-## Explore LV10
+## Upregulated
+
+LVs that are consistently upregulated in severe or active AAV as compared to
+controls.
+
+### Explore LV10
 
 Let's look at all the pathways associated with this LV.
 
@@ -46,12 +51,34 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 10], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 10], decreasing = TRUE))
 ```
 
-## Explore LV524
+### Explore LV53
 
-Let's look at all the pathways associated with this LV.
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 53,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 53], decreasing = TRUE))
+```
+
+### Explore LV63
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 63,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 63], decreasing = TRUE))
+```
+
+### Explore LV524
 
 ```{r}
 recount.plier$summary %>%
@@ -67,26 +94,22 @@ Banchereau, et al. dataset when we analyzed it in
 Let's take a look at the genes contributing to this signal.
 
 ```{r}
-head(sort(recount.plier$Z[, 524], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 524], decreasing = TRUE))
 ```
 
-## Explore LV624
-
-No significant pathways.
+### Explore LV624
 
 ```{r}
-head(sort(recount.plier$Z[, 624], decreasing = TRUE), 50)
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 624,
+                FDR < 0.05)
 ```
-
-## Explore LV793
-
-No significant pathways.
 
 ```{r}
-head(sort(recount.plier$Z[, 793], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 624], decreasing = TRUE))
 ```
 
-## Explore LV937
+### Explore LV937
 
 ```{r}
 recount.plier$summary %>%
@@ -95,5 +118,95 @@ recount.plier$summary %>%
 ```
 
 ```{r}
-head(sort(recount.plier$Z[, 937], decreasing = TRUE), 50)
+data.frame(loadings = sort(recount.plier$Z[, 937], decreasing = TRUE))
 ```
+
+## Downregulated
+
+LVs that are consistently downregulated in severe or active AAV as compared to
+controls.
+
+### Explore LV139
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 139,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 139], decreasing = TRUE))
+```
+
+### Explore LV332
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 332,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 332], decreasing = TRUE))
+```
+
+### Explore LV346
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 346,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 346], decreasing = TRUE))
+```
+
+### Explore LV631
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 631,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 631], decreasing = TRUE))
+```
+
+### Explore LV793
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 793,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 793], decreasing = TRUE))
+```
+
+### Explore LV887
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 887,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 887], decreasing = TRUE))
+```
+
+### Explore LV909
+
+```{r}
+recount.plier$summary %>%
+  dplyr::filter(`LV index` == 909,
+                FDR < 0.05)
+```
+
+```{r}
+data.frame(loadings = sort(recount.plier$Z[, 909], decreasing = TRUE))
+```
+
