@@ -182,6 +182,8 @@ ifn.summary.df <-
   CalculateChangeFromBaseline(df = as.data.frame(ifn.summary.df),
                               variable.id = "Module",
                               value.id = "Summary")
+df.file <- file.path(results.dir, "E-GEOD-39088_IFNk_Chiche_modules_change.tsv")
+readr::write_tsv(ifn.summary.df, df.file)
 ```
 
 #### Plot
@@ -216,6 +218,8 @@ ifn.b.df <- sle.b.df %>%
 ifn.b.df <- CalculateChangeFromBaseline(df = as.data.frame(ifn.b.df),
                                         variable.id = "LV",
                                         value.id = "Value")
+df.file <- file.path(results.dir, "E-GEOD-39088_IFNk_SLE_PLIER_change.tsv")
+readr::write_tsv(ifn.b.df, df.file)
 ```
 
 ```{r}
@@ -248,6 +252,8 @@ ifn.b.df <- recount.b.df %>%
 ifn.b.df <- CalculateChangeFromBaseline(df = as.data.frame(ifn.b.df),
                                         variable.id = "LV",
                                         value.id = "Value")
+df.file <- file.path(results.dir, "E-GEOD-39088_IFNk_recount2_PLIER_change.tsv")
+readr::write_tsv(ifn.b.df, df.file)
 ```
 ```{r}
 # plot
@@ -378,7 +384,7 @@ p <- PlotInteraction(df = recount.b.df,
                      y.var = "Value",
                      wrap.var = "LV",
                      y.label = "LV value",
-                     plot.title = "SLE WB PLIER - Treatment with AMG 811")
+                     plot.title = "recount2 PLIER - Treatment with AMG 811")
 
 plot.file <- file.path(plot.dir, "E-GEOD-78193_recount2_PLIER_boxplot.pdf")
 ggplot2::ggsave(plot.file, plot = p, width = 11, height = 7, units = "in")
