@@ -44,3 +44,8 @@ data/sample_info/sle-wb_sample_dataset_mapping.tsv
 data/kidney/
 data/rtx/
 
+# very large file -- SRAdb data
+SRAmetadb.sqlite
+
+# MetaSRA data
+data/sample_info/metasra.v1-4.json
