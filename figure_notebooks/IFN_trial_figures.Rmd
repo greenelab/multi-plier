@@ -111,7 +111,7 @@ Day112Plot <- function(df,
 }
 ```
 
-### multiPLIER
+### MultiPLIER
 
 ```{r}
 b.file <- file.path("results", "09", "E-GEOD-39088_recount2_PLIER_IFN_B.tsv")
@@ -121,7 +121,7 @@ b.df <- readr::read_tsv(b.file)
 ```{r}
 baseline.p <- b.df %>%
   dplyr::filter(!Day %in% c("day 112", "day 168"),
-                Group != "Control, stimulated") %>%
+                !Group %in% c("Control, stimulated", "Placebo")) %>%
   dplyr::mutate(`IFN-level` = 
                   dplyr::if_else(`Disease state` == "healthy", 
                                  true = "Control", 
@@ -156,7 +156,7 @@ lv116.p
 p <- cowplot::plot_grid(baseline.p, lv116.p, align = "h", axis = "b", 
                         rel_widths = c(1.5, 1), labels = c("A", "B"))
 p.title <- cowplot::ggdraw() + 
-  cowplot::draw_label("multiPLIER", fontface = "bold",
+  cowplot::draw_label("MultiPLIER", fontface = "bold",
                       size = 20)
 multi.p <- cowplot::plot_grid(p.title, p, ncol = 1, rel_heights = c(0.1, 1))
 ggplot2::ggsave(file.path(plot.dir, "IFN-K_main.pdf"), plot = multi.p, 
@@ -179,7 +179,7 @@ mod.df <- readr::read_tsv(mod.file)
 ```{r}
 baseline.p <- mod.df %>%
   dplyr::filter(!Day %in% c("day 112", "day 168"),
-                Group != "Control, stimulated") %>%
+                !Group %in% c("Control, stimulated", "Placebo")) %>%
   dplyr::mutate(`IFN-level` = 
                   dplyr::if_else(`Disease state` == "healthy", 
                                  true = "Control", 
@@ -238,7 +238,7 @@ b.df <- readr::read_tsv(b.file)
 ```{r}
 baseline.p <- b.df %>%
   dplyr::filter(!Day %in% c("day 112", "day 168"),
-                Group != "Control, stimulated") %>%
+                !Group %in% c("Control, stimulated", "Placebo")) %>%
   dplyr::mutate(`IFN-level` = 
                   dplyr::if_else(`Disease state` == "healthy", 
                                  true = "Control", 
@@ -270,6 +270,17 @@ lv6.p <- lv.change.df %>%
                 Day == "day 112") %>%
   Day112Plot(filt.var = "LV6")
 lv6.p
+```
+
+Let's check `LV110` for differential expression even though it may be better
+capturing another signal (e.g., macrophages).
+
+```{r}
+lv110.df <- lv.change.df %>%
+  dplyr::filter(LV == "LV110",
+                Day == "day 112",
+                `IFN-level` != "IFN-negative")
+wilcox.test(lv110.df$Change ~ lv110.df$Group)
 ```
 
 ```{r}
@@ -323,12 +334,11 @@ PlotInteraction <- function(df, plot.title, y.var = "Value", wrap.var = "LV",
                                           "#3182bd", "white")) +
     ggplot2::scale_x_discrete(labels = c("healthy", "SLE baseline", 
                                          "SLE day 15", "SLE day 56", 
-                                         "SLE EOS")) +
-    ggsignif::geom_signif()
+                                         "SLE EOS"))
 }
 ```
 
-### multiPLIER
+### MultiPLIER
 
 ```{r}
 b.file <- file.path("results", "09", "E-GEOD-78193_recount2_PLIER_IFN_B.tsv")
@@ -341,7 +351,7 @@ multi.p <- b.df %>%
     LV == "LV116" ~ "LV116 Type I",
     LV == "LV140" ~ "LV140 Type II"
   )) %>%
-  PlotInteraction(plot.title ="multiPLIER")
+  PlotInteraction(plot.title ="MultiPLIER")
 ```
 
 ```{r}

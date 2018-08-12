@@ -87,6 +87,7 @@ pathway.cov.p <- pathway.df %>%
   ggplot2::geom_boxplot() +
   ggplot2::geom_point(position = ggplot2::position_jitter(0.2),
                       alpha = 0.5) +
+  ggplot2::ylim(c(0, 0.45)) +
   ggplot2::labs(x = "training set", 
                 y = "proportion of input pathways",
                 title = "Pathway Coverage") +
@@ -116,6 +117,7 @@ lv.assoc.p <- pathway.df %>%
   ggplot2::geom_boxplot() +
   ggplot2::geom_point(position = ggplot2::position_jitter(0.2),
                       alpha = 0.5) +
+  ggplot2::ylim(c(0, 0.625)) +
   ggplot2::labs(x = "training set", 
                 y = "proportion of LVs",
                 title = "LVs significantly associated\nwith pathways") +
