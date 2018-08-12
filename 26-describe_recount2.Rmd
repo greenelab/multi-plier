@@ -1,0 +1,179 @@
+---
+title: "Describe recount2 compendium"
+output: html_notebook
+---
+
+**J. Taroni 2018**
+
+In response to comments, we wish to provide a bit more background information 
+about the recount2 compendium.
+To do so, we'll gather information from the following sources:
+
+* The expression data used to train the model
+* [MetaSRA](http://metasra.biostat.wisc.edu/index.html)
+* SRAdb (for accession identifier conversion)
+
+## Download MetaSRA data
+
+```{sh}
+wget -O data/sample_info/metasra.v1-4.json http://metasra.biostat.wisc.edu/static/metasra_versions/v1.4/metasra.v1-4.json
+```
+
+## Libraries, functions
+
+```{r}
+# BiocInstaller::biocLite("SRAdb")
+library(SRAdb)
+
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+```
+
+## Read in data
+
+### recount2 data used to train PLIER
+
+```{r}
+plier.file <- file.path("data", "recount2_PLIER_data", 
+                        "recount_data_prep_PLIER.RDS")
+plier.data <- readRDS(plier.file)
+```
+
+The experiment accession is in the column name of the expression data matrix,
+as is the run accession.
+
+```{r}
+experiment.accession <- unique(stringr::word(colnames(plier.data$rpkm.cm), 1, 
+                                             sep = "[.]"))
+head(experiment.accession)
+```
+
+```{r}
+run.accession <- stringr::word(colnames(plier.data$rpkm.cm), 2, sep = "[.]")
+```
+
+```{r}
+# remove the training data from the workspace, we no longer need it
+rm(plier.data)
+```
+
+### MetaSRA
+
+```{r}
+metasra.file <- file.path("data", "sample_info", "metasra.v1-4.json")
+metasra <- jsonlite::read_json(metasra.file)
+```
+
+The MetaSRA project uses _sample_ identifiers (`SRS`), whereas recount2 uses 
+_study_ (`SRP`) and _run_ (`SRR`) identifiers.
+We'll need to convert between the two. 
+We'll use the `SRAdb` Bioconductor package to do so.
+
+#### Identifier conversion
+
+For notebook purposes, I will comment most of this out, as the file downloaded 
+and unzipped by calling `SRAdb::getSRAdbFile()` is ~35GB.
+I will save (& commit) the most important part: the data.frame that contains
+the mapping between accessions.
+
+```{r}
+# sql.file <- getSRAdbFile()
+```
+
+```{r}
+# sql.file <- "SRAmetadb.sqlite"
+# sra.con <- dbConnect(SQLite(), sql.file)  
+# given the run accession, return the study and sample accesions
+# conversion.df <- sraConvert(run.accession, 
+#                             out_type = c("study", "sample"), sra.con)
+# conversion.file <- file.path("data/sample_info/recount2_srr_srs_srp.tsv")
+# readr::write_tsv(conversion.df, conversion.file)
+```
+
+```{sh}
+# md5sum SRAmetadb.sqlite
+```
+
+## Describe recount2
+
+```{r}
+# only proceed with samples that are in the recount2 compendium that we used
+filtered.metasra <- metasra[which(names(metasra) %in% conversion.df$sample)]
+```
+
+Not all of the runs in the subset of the recount2 compendium we used are 
+present in MetaSRA.
+
+```{r}
+length(filtered.metasra) / length(run.accession)
+```
+
+But the majority are.
+
+### Sample type
+
+The MetaSRA project ([Bernstein, Doan, and Dewey. _Bioinformatics._ 2017.](https://doi.org/10.1093/bioinformatics/btx334)) 
+predicted the "sample type" -- e.g., cell line vs. tissue.
+What's the breakdown in the compendium we used for training (with no regard 
+for _confidence_)?
+
+```{r}
+sample.type <- lapply(filtered.metasra, function(x) x$`sample type`)
+table(unlist(sample.type))
+```
+
+The bulk of samples are predicted to be cell lines and tissue samples.
+
+### Experimental Factor Ontology (EFO)
+
+We'll use the mapped ontology terms -- specifically, the mapped
+[Experimental Factor Ontology](https://www.ebi.ac.uk/efo/) terms -- provided in
+MetaSRA to get an idea of what's in our training set.
+
+We've been asked specifically about autoimmune samples and cancer samples, so
+let's start there.
+
+### Autoimmune disease
+
+```{r}
+# "autoimmune disease"
+# https://www.ebi.ac.uk/ols/ontologies/efo/terms?short_form=EFO_0005140
+autoimmune.samples <- 
+  lapply(filtered.metasra, 
+         function(x) any("EFO:0005140" %in% x$`mapped ontology terms`))
+sum(unlist(autoimmune.samples))
+```
+
+There are 99 SLE samples (and 18 controls) in the single SLE whole blood data 
+set in recount2 
+([`SRP062966`](http://trace.ncbi.nlm.nih.gov/Traces/sra/?study=SRP062966)).
+
+### Cancer
+
+```{r}
+# "cancer"
+# https://www.ebi.ac.uk/ols/ontologies/efo/terms?short_form=EFO_0000311
+cancer.samples <- 
+  lapply(filtered.metasra, 
+         function(x) any("EFO:0000311" %in% x$`mapped ontology terms`))
+sum(unlist(cancer.samples))
+```
+
+### What about treated samples?
+
+[`treatment`](https://www.ebi.ac.uk/ols/ontologies/efo/terms?short_form=EFO_0000727)
+
+From EFO term:
+
+> A process in which the act is intended to modify or alter some other 
+material entity
+
+```{r}
+# "treatment"
+# https://www.ebi.ac.uk/ols/ontologies/efo/terms?short_form=EFO_0000727
+treatment.samples <- 
+  lapply(filtered.metasra, 
+         function(x) any("EFO:0000727" %in% x$`mapped ontology terms`))
+sum(unlist(treatment.samples))
+```
+
