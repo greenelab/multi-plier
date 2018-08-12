@@ -1,0 +1,271 @@
+---
+title: "Tweaking display items: AAV multi-tissue plots"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+## Set up 
+
+```{r setup}
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+```
+
+## Plotting
+
+### Plotting functions
+
+```{r}
+mean_ci <- function(x) ggplot2::mean_se(x, mult = 2)
+
+# custom ggplot2 theme
+custom_theme <- function() {
+  ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, 
+                                                       hjust = 1),
+                   legend.position = "none",
+                   plot.title = ggplot2::element_text(hjust = 0.5),
+                   axis.title.x = ggplot2::element_blank()) 
+}
+```
+
+#### Building a multipanel plot
+
+All of these are intended to be used in the global environment of this notebook
+
+```{r}
+MultitissuePlotWrapper <- function(lv.name, y.label) {
+  # lv.name: string to be passed to dplyr::filter -- one LV plotted at a time
+  # y.label: string to be passed to ggplot2::labs(y = y.label)
+  # returns a list of 3 plots
+  
+  # initialize list to hold plots
+  plot.list <- list()
+  
+  #### NARES
+  plot.list[["nares.p"]] <- nares.df %>%
+    dplyr::filter(LV == lv.name) %>%
+    ggplot2::ggplot(ggplot2::aes(x = Classification, y = Value)) +
+    ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
+                         ggplot2::aes(colour = Classification)) +
+    ggplot2::stat_summary(geom = "pointrange", 
+                          fun.data = mean_ci) +
+    ggplot2::labs(y = y.label, title = "Nasal Brushings") +
+    ggplot2::scale_color_manual(values = c("#2F4F4F", "#191970", "#20B2AA",
+                                           "#666666", "#CDCD00", "#FF4500",
+                                           "#FF8C69")) +
+    custom_theme() +
+    ggsignif::geom_signif(comparisons = list(c("GPA active", "Healthy")),
+                          tip_length = 0)
+  
+  #### Glomeruli ####
+  plot.list[["glom.p"]] <- kidney.df %>% 
+    dplyr::filter(LV == lv.name) %>%
+    ggplot2::ggplot(ggplot2::aes(x = Diagnosis, y = Value)) +
+    ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
+                         ggplot2::aes(colour = Diagnosis)) +
+    ggplot2::stat_summary(geom = "pointrange",
+                          fun.data = mean_ci) +
+    ggplot2::labs(title = "Glomeruli") +
+    ggplot2::scale_color_manual(values = c("#2F4F4F", "#666666", "#FF8C69")) +
+    custom_theme() +
+    ggplot2::theme(axis.title.y = ggplot2::element_blank()) +
+    ggsignif::geom_signif(comparisons = list(c("Vasculitis", 
+                                               "Living donor control")),
+                          tip_length = 0)
+  
+  #### PBMC ####
+  plot.list[["pbmc.p"]] <- gpa.df %>%
+    dplyr::filter(LV == lv.name) %>%
+    ggplot2::ggplot(ggplot2::aes(x = GPA_signature, y = Value)) +
+    ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
+                         ggplot2::aes(colour = GPA_signature)) +
+    ggplot2::stat_summary(geom = "pointrange", 
+                          fun.data = mean_ci) +
+    ggplot2::labs(title = "PBMCs") +
+    ggplot2::scale_color_manual(values = c("#2F4F4F", "#20B2AA", "#FF8C69")) +
+    custom_theme() +
+    ggplot2::theme(axis.title.y = ggplot2::element_blank()) +
+    ggsignif::geom_signif(comparisons =  list(c("GPA-positive", "Control")),
+                          tip_length = 0)
+  
+  return(plot.list)
+}
+```
+
+```{r}
+ThreeTissuePanels <- function(plot.list, plot.title) {
+  # plot.list: list of 3 plots, MultitissuePlotWrapper output plus some y-axis
+  #            tinkering
+  # plot.title: string, title of the plot
+  
+  # multipanel part
+  p <- cowplot::plot_grid(plotlist = plot.list, align = "h", ncol = 3, 
+                          scale = 0.95, labels = "AUTO", 
+                          rel_widths = c(1.075, 1, 1))
+  # title panel
+  p.title <- cowplot::ggdraw() + 
+    cowplot::draw_label(plot.title, fontface = "bold", size = 15)
+  # add title to plot
+  p <- cowplot::plot_grid(p.title, p, ncol = 1, rel_heights = c(0.1, 1))
+  # x-axis label
+  p.xlab <- cowplot::ggdraw() +
+    cowplot::draw_label("Patient Group", size = 12.5)
+  # add x-axis label
+  p.return <- cowplot::plot_grid(p, p.xlab, ncol = 1, rel_heights = c(1, 0.1))
+  # return multipanel plot (3 tissues) with title and x-axis label
+  return(p.return)
+}
+```
+
+```{r}
+BarplotPanel <- function(lv.index, plot.title, top.n = 25) {
+  # get into appropriate data.frame for bar plot
+  top.z.df <- as.data.frame(sort(recount.plier$Z[, lv.index],
+                                 decreasing = TRUE)[1:top.n])
+  top.z.df <- tibble::rownames_to_column(top.z.df, var = "Gene")
+  colnames(top.z.df)[2] <- "Z"
+  # reorder for plotting
+  top.z.df$Gene <- factor(top.z.df$Gene,
+                          levels = top.z.df$Gene[top.n:1])
+  bar.p <- ggplot2::ggplot(top.z.df, 
+                           ggplot2::aes(x = Gene, y = Z)) +
+    ggplot2::geom_bar(stat = "identity", colour = "black") +
+    ggplot2::theme_bw() +
+    ggplot2::coord_flip() +
+    ggplot2::ggtitle(plot.title) +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                      face = "bold"),
+                   text = ggplot2::element_text(size = 12),
+                   plot.margin = ggplot2::margin(5.5, 25, 5.5, 5.5))
+  # return barplot
+  return(bar.p)
+}
+```
+
+
+### Read in data
+
+#### recount2 model
+
+```{r}
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+#### LV values from three tissues
+
+```{r}
+nares.file <- file.path("results", "18", 
+                        "NARES_recount2_model_B_long_sample_info.tsv")
+nares.df <- readr::read_tsv(nares.file) %>%  
+  dplyr::mutate(Classification =
+                  dplyr::recode(Classification,
+                    `GPA with active nasal disease` = "GPA active",
+                    `GPA with prior nasal disease` = "GPA prior",
+                    `GPA (no prior nasal disease)` = "GPA none"
+                  )) %>%
+  dplyr::mutate(Classification = 
+                  factor(Classification, 
+                            levels = c("GPA active",
+                                       "GPA prior",
+                                       "GPA none",
+                                       "EGPA",
+                                       "Allergic Rhinitis",
+                                       "Sarcoidosis",
+                                       "Healthy")))
+```
+
+```{r}
+gpa.file <- file.path("results", "19", 
+                      "GPA_blood_recount2_model_B_long_sample_info.tsv")
+gpa.df <- readr::read_tsv(gpa.file) %>%
+  dplyr::mutate(GPA_signature = dplyr::recode(GPA_signature, 
+                                              GPApos = "GPA-positive",
+                                              GPAneg = "GPA-negative",
+                                              Control = "Control")) %>%
+  dplyr::mutate(GPA_signature = factor(GPA_signature,
+                                       levels = c("GPA-positive", 
+                                                  "GPA-negative", 
+                                                  "Control"))) 
+```
+
+```{r}
+kidney.file <- file.path("results", "20", 
+                         "ERCB_glom_recount2_model_B_long_sample_info.tsv")
+kidney.df <- readr::read_tsv(kidney.file) %>%
+  dplyr::mutate(Diagnosis = factor(Diagnosis, 
+                                   levels = c("Vasculitis", 
+                                              "Nephrotic syndrome",
+                                              "Living donor control")))
+
+```
+
+#### LV10
+
+First, the jitter plots from 3 tissues
+
+```{r}
+plot.list <- MultitissuePlotWrapper(lv.name = "10,SVM Macrophages M0",
+                                    y.label = "MultiPLIER LV10")
+# adjust y-axes to accommodate geom_signif layer
+plot.list$nares.p <- plot.list$nares.p + ggplot2::ylim(c(-0.15, 0.26))
+plot.list$glom.p <- plot.list$glom.p + ggplot2::ylim(c(-0.15, 0.4))
+plot.list$pbmc.p <- plot.list$pbmc.p + ggplot2::ylim(-0.1, 0.1)
+```
+
+```{r}
+p.10 <- ThreeTissuePanels(plot.list = plot.list,
+                          plot.title = "MultiPLIER Macrophage LV in ANCA-associated Vasculitis")
+ggplot2::ggsave(file.path(plot.dir, "AAV_LV10_multipanel_no_barplot.pdf"),
+                plot = p.10, width = 11, height = 7)
+```
+
+```{r}
+bar.p <- BarplotPanel(10, "Macrophage LV10 Loadings")
+```
+
+```{r}
+multi.p.10 <- cowplot::plot_grid(p.10, bar.p, labels = c(NA, "D"), scale = 0.95, 
+                                 rel_widths = c(2.35, 1), 
+                                 rel_heights = c(1.95, 1))
+ggplot2::ggsave(file.path(plot.dir, "AAV_LV10_multipanel.pdf"), 
+                plot = multi.p.10, width = 14, height = 8.5)
+```
+
+
+#### LV 937
+
+```{r}
+plot.list <- MultitissuePlotWrapper(lv.name = "937,PID_HIF1_TFPATHWAY",
+                                    y.label = "MultiPLIER LV937")
+# adjust y-axes to accommodate geom_signif layer
+plot.list$nares.p <- plot.list$nares.p + ggplot2::ylim(c(-0.15, 0.55))
+plot.list$glom.p <- plot.list$glom.p + ggplot2::ylim(c(-0.15, 0.185))
+plot.list$pbmc.p <- plot.list$pbmc.p + ggplot2::ylim(-0.07, 0.06)
+
+p.937 <- ThreeTissuePanels(plot.list = plot.list,
+                           plot.title = "MultiPLIER HIF-1a TF network LV in ANCA-associated Vasculitis")
+ggplot2::ggsave(file.path(plot.dir, "AAV_LV937_multipanel_no_barplot.pdf"), 
+                plot = p.937, width = 11, height = 7)
+
+bar.p <- BarplotPanel(937, "HIF-1a LV937 Loadings")
+multi.p.937 <- cowplot::plot_grid(p.937, bar.p, labels = c(NA, "D"), 
+                                  scale = 0.95, 
+                                  rel_widths = c(2.35, 1), 
+                                  rel_heights = c(1.95, 1))
+ggplot2::ggsave(file.path(plot.dir, "AAV_LV937_multipanel.pdf"), 
+                plot = multi.p.937, width = 14, height = 8.5)
+```
+
