@@ -1,0 +1,46 @@
+---
+title: "MultiPLIER U plot for selected LVs"
+output: html_notebook
+---
+
+**J. Taroni 2018**
+
+A co-author suggested that we include a U plot for MultiPLIER LVs that we 
+talk about in the main text of the manuscript.
+
+## Set up
+
+```{r setup}
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+library(PLIER)
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+dir.create(plot.dir, showWarnings = FALSE, recursive = TRUE)
+```
+
+## Read in MultiPLIER model
+
+```{r}
+plier.file <- file.path("data", "recount2_PLIER_data", 
+                        "recount_PLIER_model.RDS")
+plier.results <- readRDS(plier.file)
+```
+
+## Plot selected LVs
+
+```{r}
+lvs.to.plot <- c(140, 116, 603, 10, 937, 524, 951, 599)
+```
+
+```{r}
+pdf(file.path(plot.dir, "MultiPLIER_U_plot_fdr0.05_selected_LVs.pdf"))
+PLIER::plotU(plier.results, fdr.cutoff = 0.05, indexCol = lvs.to.plot,
+             fontsize_row = 9, main = "MultiPLIER")
+dev.off()
+```
+
