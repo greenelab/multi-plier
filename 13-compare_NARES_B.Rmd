@@ -198,7 +198,8 @@ gplots::heatmap.2(cor.map.mat,
                   cexCol = 0.75, cexRow = 0.7,
                   RowSideColors = row.color.bar, key = FALSE,
                   labRow = sub("nares", "NARES ", rownames(cor.map.mat)),
-                  labCol = c("Z", "B"))
+                  labCol = c("Z", "B"),
+                  srtCol = 45)
 legend("topleft", 
        legend = c("significant"),
        col = c("#0000FF"), cex = 0.75,
