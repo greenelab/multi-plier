@@ -133,6 +133,8 @@ head(neutro.lv.df)
 # join with MCPcounter neutrophil estimates
 neutro.df <- dplyr::filter(mcp.melt, Cell_type == "Neutrophils") %>%
                 dplyr::inner_join(y = neutro.lv.df, by = "Sample")
+neutro.file <- file.path(results.dir, "NARES_neutrophil_LV_mcp_all.tsv")
+readr::write_tsv(neutro.df, path = neutro.file)
 ```
 
 ### Plotting
