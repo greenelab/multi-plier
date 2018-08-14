@@ -1,0 +1,130 @@
+---
+title: "Tweaking display items: ANCA antigens"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+ANCA antigen figures `recount2 LV 599` jitter plot + gene loadings
+
+## Set up
+
+```{r setup}
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+```
+
+## Plotting
+
+### Plotting functions
+
+```{r}
+# passed to geom_pointrange -- plot the mean +/- 2 * SEM 
+mean_ci <- function(x) ggplot2::mean_se(x, mult = 2)
+
+# custom ggplot2 theme
+custom_theme <- function() {
+  ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, 
+                                                       hjust = 1),
+                   legend.position = "none",
+                   plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                      face = "bold"),
+                   plot.subtitle = ggplot2::element_text(hjust = 0.5))
+}
+```
+
+#### Jitter plot
+
+```{r}
+blood.file <- file.path("results", "19", 
+                        "GPA_blood_recount2_model_B_long_sample_info.tsv")
+blood.df <- readr::read_tsv(blood.file) %>% 
+  dplyr::mutate(GPA_signature = dplyr::recode(GPA_signature, 
+                                              GPApos = "GPA-positive",
+                                              GPAneg = "GPA-negative",
+                                              Control = "Control")) %>%
+  dplyr::mutate(GPA_signature = factor(GPA_signature,
+                                       levels = c("GPA-positive", 
+                                                  "GPA-negative", 
+                                                  "Control"))) %>%
+  dplyr::filter(LV == "599,DMAP_ERY2")
+```
+
+```{r}
+jitter.p <- blood.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = GPA_signature, y = Value)) +
+  ggplot2::geom_jitter(width = 0.2, alpha = 0.6,
+                       ggplot2::aes(colour = GPA_signature)) +
+  ggplot2::stat_summary(geom = "pointrange", 
+                        fun.data = mean_ci) +
+  ggplot2::labs(x = "GPA signature", y = "MultiPLIER LV599", 
+                title = "MultiPLIER", subtitle = "GPA PBMCs") +
+  ggplot2::scale_color_manual(values = c("#2F4F4F", "#20B2AA", "#FF8C69")) +
+  custom_theme() +
+  ggplot2::theme(text = ggplot2::element_text(size = 15))
+```
+
+#### Loadings bar plot
+
+Load recount2 PLIER model
+
+```{r}
+recount.plier <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                   "recount_PLIER_model.RDS"))
+```
+
+```{r}
+antigens <- c("MPO", "ELANE", "BPI", "CTSG", "LCN2", "AZU1", "PRTN3")
+```
+
+```{r}
+# get into appropriate data.frame for bar plot
+top.z.df <- as.data.frame(sort(recount.plier$Z[, 599],
+                               decreasing = TRUE)[1:50])
+top.z.df <- tibble::rownames_to_column(top.z.df, var = "Gene")
+colnames(top.z.df)[2] <- "Z"
+
+# add in autoantigen information
+top.z.df <- top.z.df %>%
+  dplyr::mutate(ANCA_antigen =
+                  dplyr::case_when(
+                    Gene %in% antigens ~ "Yes",
+                    TRUE ~ "No"
+                  ))
+
+# reorder for plotting
+top.z.df$Gene <- factor(top.z.df$Gene,
+                        levels = top.z.df$Gene[50:1])
+```
+
+```{r}
+bar.p <- ggplot2::ggplot(top.z.df, 
+                ggplot2::aes(x = Gene, y = Z, fill = ANCA_antigen)) +
+  ggplot2::geom_bar(stat = "identity", colour = "#424242") +
+  ggplot2::theme_bw() +
+  ggplot2::scale_fill_manual(values = c("#FFFFFF", "#000000")) +
+  ggplot2::coord_flip() +
+  ggplot2::labs(title = "MultiPLIER LV599 Loadings", fill = "ANCA antigen") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                    face = "bold"),
+                 axis.text.y = ggplot2::element_text(size = 7))
+```
+
+```{r}
+p <- cowplot::plot_grid(jitter.p, bar.p, nrow = 1, scale = 0.95, 
+                        labels = c("A", "B"))
+ggplot2::ggsave(file.path(plot.dir, "ANCA_antigen_figure.pdf"), plot = p,
+                width = 8.5, height = 5)
+```
+

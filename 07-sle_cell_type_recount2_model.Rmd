@@ -217,6 +217,11 @@ head(neutro.df)
 ```
 
 ```{r}
+neutro.out.file <- file.path(results.dir, "neutrophil_count_LV_both_models.tsv")
+readr::write_tsv(neutro.df, path = neutro.out.file)
+```
+
+```{r}
 # function for scatter plots, given lv (a string indicating the LV of interest)
 # make a scatter plot where the LV is the x variable, neutrophil count is the
 # y variable & fit a line with geom_smooth(method = "lm")
