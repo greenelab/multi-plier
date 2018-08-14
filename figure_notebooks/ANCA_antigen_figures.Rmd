@@ -29,6 +29,7 @@ plot.dir <- file.path("figure_notebooks", "figures")
 ### Plotting functions
 
 ```{r}
+# passed to geom_pointrange -- plot the mean +/- 2 * SEM 
 mean_ci <- function(x) ggplot2::mean_se(x, mult = 2)
 
 # custom ggplot2 theme
