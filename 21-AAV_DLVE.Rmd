@@ -19,14 +19,6 @@ At first, we'll take the naive approach of just looking at the overlapping
 sets of significant LVs.
 There's no guarantee that the directionality will be in agreement this way.
 
-## Install VennDiagram & cowplot
-
-```{r}
-# current versions on CRAN
-devtools::install_url("https://cran.r-project.org/src/contrib/VennDiagram_1.6.20.tar.gz")
-devtools::install_url("https://cran.r-project.org/src/contrib/cowplot_0.9.2.tar.gz")
-```
-
 ## Functions and directory set up
 
 ```{r}
