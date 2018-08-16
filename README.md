@@ -66,7 +66,7 @@ For more information about the training set, please see [this notebook](https://
 
 Analysis notebooks are number and present in the top level directory.
 We've enabled [Github pages](https://pages.github.com/) for easy viewing of the notebooks. 
-For example, `05-sle-wb_PLIER` can be viewed here: [https://greenelab.github.io/multi-plier/05-sle-wb_PLIER.nb.html](05-sle-wb_PLIER.nb.html)
+For example, `05-sle-wb_PLIER` can be viewed here: [https://greenelab.github.io/multi-plier/05-sle-wb_PLIER.nb.html](https://greenelab.github.io/multi-plier/05-sle-wb_PLIER.nb.html)
 
 The [`figure_notebooks`](https://github.com/greenelab/multi-plier/tree/master/figure_notebooks) directory contains notebooks that were used specifically to generate figures suitable for publication ([`figure_notebooks/figures`](https://github.com/greenelab/multi-plier/tree/master/figure_notebooks/figures)).
 
