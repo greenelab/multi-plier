@@ -64,7 +64,7 @@ For more information about the training set, please see [this notebook](https://
 
 ### Notebooks
 
-Analysis notebooks are number and present in the top level directory.
+Analysis notebooks are numbered and present in the top level directory.
 We've enabled [Github pages](https://pages.github.com/) for easy viewing of the notebooks. 
 For example, `05-sle-wb_PLIER` can be viewed here: [https://greenelab.github.io/multi-plier/05-sle-wb_PLIER.nb.html](https://greenelab.github.io/multi-plier/05-sle-wb_PLIER.nb.html)
 
