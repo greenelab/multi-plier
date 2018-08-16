@@ -65,8 +65,36 @@ For more information about the training set, please see [this notebook](https://
 ### Notebooks
 
 Analysis notebooks are numbered and present in the top level directory.
-We've enabled [Github pages](https://pages.github.com/) for easy viewing of the notebooks. 
-For example, `05-sle-wb_PLIER` can be viewed here: [https://greenelab.github.io/multi-plier/05-sle-wb_PLIER.nb.html](https://greenelab.github.io/multi-plier/05-sle-wb_PLIER.nb.html)
+We've enabled [Github pages](https://pages.github.com/) for easy viewing of the notebooks.
+Some steps in the pipeline are R scripts rather than notebooks due to their computationally intensive nature;
+we exclude these from the TOC below.
+
+* [PLIER functions proof of concept](https://greenelab.github.io/multi-plier/01-PLIER_util_proof-of-concept_notebook.nb.html)
+2. [Exploratory analysis of the recount2 PLIER model (MultiPLIER)](https://greenelab.github.io/multi-plier/02-recount2_PLIER_exploration.nb.html)
+3. [MultiPLIER on isolated immune cell populations microarray data](https://greenelab.github.io/multi-plier/03-isolated_cell_type_populations.nb.html)
+4. [Reconstruction of isolated immune cell data](https://greenelab.github.io/multi-plier/04-isolated_immune_cell_reconstruction.nb.html)
+5. [Training PLIER on the SLE whole blood compendium](https://greenelab.github.io/multi-plier/05-sle-wb_PLIER.nb.html)
+6. [Analyzing cell type-associated LVs in the SLE WB data with SLE WB PLIER model](https://greenelab.github.io/multi-plier/06-sle-wb_cell_type.nb.html)
+7. [Analyzing cell type patterns in the SLE WB data using MultiPLIER](https://greenelab.github.io/multi-plier/07-sle_cell_type_recount2_model.nb.html)
+8. [Identifying interferon-related LVs in the SLE WB and MultiPLIER models](https://greenelab.github.io/multi-plier/08-identify_ifn_LVs.nb.html)
+9. [Preparing IFN trials data for plotting](https://greenelab.github.io/multi-plier/09-sle_ifn_data_prep.nb.html)
+10. [Plotting IFN trial results](https://greenelab.github.io/multi-plier/10-sle_ifn_analysis.nb.html)
+12. [Training a PLIER model on the NARES nasal brushing microarray dataset](https://greenelab.github.io/multi-plier/12-train_NARES_PLIER.nb.html)
+13. [Comparing the NARES and MultiPLIER latent spaces](https://greenelab.github.io/multi-plier/13-compare_NARES_B.nb.html)
+14. [Comparing the MultiPLIER neutrophil-associated LV expression values to `MCPcounter` estimates](https://greenelab.github.io/multi-plier/14-NARES_MCPcounter.nb.html)
+15. [Evaluating PLIER models trained on subsampled recount2 compendia](https://greenelab.github.io/multi-plier/15-evaluate_subsampling.nb.html)
+17. [Plotting metrics for PLIER model repeats](https://greenelab.github.io/multi-plier/17-plotting_repeat_evals.nb.html)
+18. [Identifying differentially expressed MultiPLIER LVs (DELVs) in the NARES nasal brushing dataset](https://greenelab.github.io/multi-plier/18-NARES_differential_expression.nb.html)
+19. [Identifying DELVs in granulomatosis with polyangiitis (GPA) peripheral blood mononuclear cells (PBMCs)](https://greenelab.github.io/multi-plier/19-GPA_blood_differential_expression.nb.html)
+20. [Identifying DELVs in microdissected glomeruli cohort](https://greenelab.github.io/multi-plier/20-kidney_differential_expression.nb.html)
+21. [Identifying DELVs common across the 3 AAV tissues](https://greenelab.github.io/multi-plier/21-AAV_DLVE.nb.html)
+22. [ANCA antigens in the GPA PBMCs](https://greenelab.github.io/multi-plier/22-GPA_blood_top_LVs.nb.html)
+23. [Examine top contributing genes in ](https://greenelab.github.io/multi-plier/23-explore_AAV_recount_LVs.nb.html)
+24. [Exploring a rituximab (RTX) dataset](https://greenelab.github.io/multi-plier/24-explore_rtx.nb.html) (preliminary)
+25. [Predicting RTX response](https://greenelab.github.io/multi-plier/25-predict_response.nb.html) (very preliminary, see #18)
+26. [Describing the recount2 training set with MetaSRA predictions](https://greenelab.github.io/multi-plier/26-describe_recount2.nb.html)
+
+Note that not all analyses present in this repository are included in the preprint.
 
 The [`figure_notebooks`](https://github.com/greenelab/multi-plier/tree/master/figure_notebooks) directory contains notebooks that were used specifically to generate figures suitable for publication ([`figure_notebooks/figures`](https://github.com/greenelab/multi-plier/tree/master/figure_notebooks/figures)).
 
