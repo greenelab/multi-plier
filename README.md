@@ -4,7 +4,7 @@
 
 **Taroni JN, Grayson PC, Hu Q, Eddy S, Kretzler M, Merkel PA, and Greene CS*. 2018.**
 
-*Correspondence to [greenescientist@gmail.com](mailto:greenescientist@gmail.com) or [file an issue](https://github.com/greenelab/multi-plier/issues)
+*Correspondence [via issues](https://github.com/greenelab/multi-plier/issues) or to [greenescientist@gmail.com](mailto:greenescientist@gmail.com)
 
 **TODO:** preprint DOI, link to release that's on figshare
 
