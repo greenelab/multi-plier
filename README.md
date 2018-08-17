@@ -89,9 +89,9 @@ we exclude these from the TOC below.
 * [Identifying DELVs in microdissected glomeruli cohort](https://greenelab.github.io/multi-plier/20-kidney_differential_expression.nb.html)
 * [Identifying DELVs common across the 3 AAV tissues](https://greenelab.github.io/multi-plier/21-AAV_DLVE.nb.html)
 * [ANCA antigens in the GPA PBMCs](https://greenelab.github.io/multi-plier/22-GPA_blood_top_LVs.nb.html)
-* [Examine top contributing genes in ](https://greenelab.github.io/multi-plier/23-explore_AAV_recount_LVs.nb.html)
+* [Examining high weight genes in DELVs](https://greenelab.github.io/multi-plier/23-explore_AAV_recount_LVs.nb.html)
 * [Exploring a rituximab (RTX) dataset](https://greenelab.github.io/multi-plier/24-explore_rtx.nb.html) (preliminary)
-* [Predicting RTX response](https://greenelab.github.io/multi-plier/25-predict_response.nb.html) (very preliminary, see #18)
+* [Predicting RTX response](https://greenelab.github.io/multi-plier/25-predict_response.nb.html) (very preliminary, see [#18](https://github.com/greenelab/multi-plier/pull/18))
 * [Describing the recount2 training set with MetaSRA predictions](https://greenelab.github.io/multi-plier/26-describe_recount2.nb.html)
 
 Note that not all analyses present in this repository are included in the preprint.
