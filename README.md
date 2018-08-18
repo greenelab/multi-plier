@@ -6,7 +6,7 @@
 
 *Correspondence [via issues](https://github.com/greenelab/multi-plier/issues) or to [greenescientist@gmail.com](mailto:greenescientist@gmail.com)
 
-**TODO:** preprint DOI, link to release that's on figshare
+**TODO:** preprint DOI
 
 ## Data
 
