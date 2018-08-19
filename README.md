@@ -6,7 +6,7 @@
 
 *Correspondence [via issues](https://github.com/greenelab/multi-plier/issues) or to [greenescientist@gmail.com](mailto:greenescientist@gmail.com)
 
-**TODO:** preprint DOI, link to release that's on figshare
+**TODO:** preprint DOI
 
 ## Data
 
@@ -14,6 +14,8 @@ Data used in this analysis repo were processed in [greenelab/rheum-plier-data](h
 Please see that repository for relevant citations.
 
 The recount2 training data and the corresponding PLIER model (MultiPLIER) are too large to be stored with Git LFS, so we have placed them on [figshare](https://figshare.com/). **DOI: [10.6084/m9.figshare.5716033.v4](https://doi.org/10.6084/m9.figshare.5716033.v4)**
+
+Data and code, other than the recount2 training set and model, associated with [`v0.1.0`](https://github.com/greenelab/multi-plier/tree/v0.1.0) are available at the following **DOI: [10.6084/m9.figshare.6982919](https://doi.org/10.6084/m9.figshare.6982919)**
 
 ## Dependencies
 
