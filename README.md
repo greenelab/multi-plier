@@ -58,7 +58,7 @@ Purple fill in a cell indicates a non-zero value and a darker purple indicates a
 We show an undesirable `U` matrix in the top toy example **(Ci)** and a favorable `U` matrix in the bottom toy example **(Cii)**. **(D)** 
 If models have been trained on individual datasets, we may be required to find “matching” LVs in different dataset- or tissue-specific models using the loadings (`Z`) from each model. 
 Using a metric like the Pearson correlation between loadings, we may or may not be able to find a well-correlated match between datasets. 
-**(E)** The MultiPLIER approach: train a PLIER on a large collection of uniformly processed data from many different biological contexts and conditions (recount2; [Collado-Torres et al., 2017](https://http//doi.org/10.1038/nbt.3838))—a MultiPLIER model—and then project the individual datasets into the MultiPLIER latent space. 
+**(E)** The MultiPLIER approach: train a PLIER on a large collection of uniformly processed data from many different biological contexts and conditions (recount2; [Collado-Torres et al., 2017](https://doi.org/10.1038/nbt.3838))—a MultiPLIER model—and then project the individual datasets into the MultiPLIER latent space. 
 The hatched fill indicates the sample dataset of origin. 
 **(F)** Latent variables from the MultiPLIER model can be tested for differential expression between disease and controls in multiple tissues.
 
