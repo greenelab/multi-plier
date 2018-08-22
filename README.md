@@ -8,7 +8,7 @@
 
 ## Data
 
-Data used in this analysis repo were processed in [greenelab/rheum-plier-data](https://github.com/greenelab/). 
+Data used in this analysis repo were processed in [greenelab/rheum-plier-data](https://github.com/greenelab/rheum-plier-data). 
 Please see that repository for relevant citations.
 
 The recount2 training data and the corresponding PLIER model (MultiPLIER) are too large to be stored with Git LFS, so we have placed them on [figshare](https://figshare.com/). **DOI: [10.6084/m9.figshare.5716033.v4](https://doi.org/10.6084/m9.figshare.5716033.v4)**
