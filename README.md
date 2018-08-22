@@ -2,15 +2,13 @@
 
 ### A unsupervised transfer learning approach for rare disease transcriptomics
 
-**Taroni JN, Grayson PC, Hu Q, Eddy S, Kretzler M, Merkel PA, and Greene CS*. 2018.**
+**Taroni JN, Grayson PC, Hu Q, Eddy S, Kretzler M, Merkel PA, and Greene CS<sup>+</sup>.** [MultiPLIER: a transfer learning framework reveals systemic features of rare autoimmune disease](https://doi.org/10.1101/395947). _bioRxiv._ 2018.
 
-*Correspondence [via issues](https://github.com/greenelab/multi-plier/issues) or to [greenescientist@gmail.com](mailto:greenescientist@gmail.com)
-
-**TODO:** preprint DOI
+<sup>+</sup>Correspondence [via issues](https://github.com/greenelab/multi-plier/issues) or to [greenescientist@gmail.com](mailto:greenescientist@gmail.com)
 
 ## Data
 
-Data used in this analysis repo were processed in [greenelab/rheum-plier-data](https://github.com/greenelab/). 
+Data used in this analysis repo were processed in [greenelab/rheum-plier-data](https://github.com/greenelab/rheum-plier-data). 
 Please see that repository for relevant citations.
 
 The recount2 training data and the corresponding PLIER model (MultiPLIER) are too large to be stored with Git LFS, so we have placed them on [figshare](https://figshare.com/). **DOI: [10.6084/m9.figshare.5716033.v4](https://doi.org/10.6084/m9.figshare.5716033.v4)**
@@ -26,6 +24,10 @@ After installing Docker ([Docker documentation](https://docs.docker.com)), the i
 ```
 docker pull jtaroni/multi-plier:0.1.0
 ```
+
+We use [R notebooks](https://rmarkdown.rstudio.com/r_notebooks) for analysis, which can be run and modified using [RStudio](https://www.rstudio.com).
+RStudio is included on our Docker image. 
+[This guide](https://www.andrewheiss.com/blog/2017/04/27/super-basic-practical-guide-to-docker-and-rstudio/) from Andrew Heiss, specifically the _Run locally with a GUI_ section, is a great starting point for working with RStudio and Docker.
 
 ## Overview
 
