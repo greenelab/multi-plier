@@ -6,8 +6,6 @@
 
 <sup>+</sup>Correspondence [via issues](https://github.com/greenelab/multi-plier/issues) or to [greenescientist@gmail.com](mailto:greenescientist@gmail.com)
 
-**TODO:** preprint DOI
-
 ## Data
 
 Data used in this analysis repo were processed in [greenelab/rheum-plier-data](https://github.com/greenelab/). 
