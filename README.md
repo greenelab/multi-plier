@@ -25,6 +25,10 @@ After installing Docker ([Docker documentation](https://docs.docker.com)), the i
 docker pull jtaroni/multi-plier:0.1.0
 ```
 
+We use [R notebooks](https://rmarkdown.rstudio.com/r_notebooks) for analysis, which can be run and edited using [RStudio](https://www.rstudio.com).
+RStudio is included on our Docker image. 
+[This guide](https://www.andrewheiss.com/blog/2017/04/27/super-basic-practical-guide-to-docker-and-rstudio/) from Andrew Heiss, specifically the _Run locally with a GUI_ section, is a great starting point for working with RStudio and Docker.
+
 ## Overview
 
 Unsupervised machine learning methods provide a promising means to analyze and interpret large datasets. 
