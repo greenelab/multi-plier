@@ -2,9 +2,9 @@
 
 ### A unsupervised transfer learning approach for rare disease transcriptomics
 
-**Taroni JN, Grayson PC, Hu Q, Eddy S, Kretzler M, Merkel PA, and Greene CS*. 2018.**
+**Taroni JN, Grayson PC, Hu Q, Eddy S, Kretzler M, Merkel PA, and Greene CS<sup>+</sup>.** [MultiPLIER: a transfer learning framework reveals systemic features of rare autoimmune disease](https://doi.org/10.1101/395947). _bioRxiv._ 2018.
 
-*Correspondence [via issues](https://github.com/greenelab/multi-plier/issues) or to [greenescientist@gmail.com](mailto:greenescientist@gmail.com)
+<sup>+</sup>Correspondence [via issues](https://github.com/greenelab/multi-plier/issues) or to [greenescientist@gmail.com](mailto:greenescientist@gmail.com)
 
 **TODO:** preprint DOI
 
