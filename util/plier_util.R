@@ -402,3 +402,82 @@ EvalWrapper <- function(plier.model){
   return(return.list)
   
 }
+
+#### pathway holdout -----------------------------------------------------------
+
+CalculateHoldoutAUC <- function(plier.result, holdout.mat, ncores = 6) {
+  # This function is adapted from PLIER:::crossVal. It will calculate the
+  # AUC and p-value for each pathway in a heldout prior information matrix for
+  # each latent variable in the supplied PLIER model.
+  # 
+  # Args:
+  #   plier.result: PLIER model, output of PLIER::PLIER
+  #   holdout.mat: a prior information matrix, formatted as is passed to
+  #                PLIER::PLIER -- genes are rows, pathways are columns, values
+  #                are binary (0/1) where 1 indicates that a gene is in a 
+  #                pathway
+  #   ncores: number of cores to use for parallel backend, 6 by default
+  #
+  # Returns:
+  #  auc.df: a data.frame that contains the pathway, LV index, AUC, p-value,
+  #          and FDR for each heldout pathway-LV index pair
+  
+  require(foreach)
+  `%>%` <- dplyr::`%>%`
+  
+  # what genes were used in the model?
+  genes.in.model <- rownames(plier.result$Z)
+  
+  # get the genes that are common to the PLIER model and the oncogenic pathways
+  holdout.cg <- holdout.mat[which(rownames(holdout.mat) %in% genes.in.model), ]
+  
+  # add in genes that are missing in the new oncogenic pathway data 
+  genes.not.path <- 
+    genes.in.model[which(!(genes.in.model %in% rownames(holdout.mat)))]
+  # set all to zero -- that means they're not in the pathway
+  miss.mat <- matrix(0, ncol = ncol(holdout.cg), nrow = length(genes.not.path))
+  # set gene names (rownames) to missing gene names
+  rownames(miss.mat) <- genes.not.path
+  # add the "missing" genes
+  colnames(miss.mat) <- colnames(holdout.mat)
+  holdout.cg <- rbind(holdout.cg, miss.mat)
+  # reorder rows
+  ord.holdout <- holdout.cg[genes.in.model, ]
+  
+  # parallel backend 
+  cl <- parallel::makeCluster(ncores)
+  doParallel::registerDoParallel(cl)
+  
+  # adapted from PLIER:::crossVal -- in that function, genes that are either
+  # not in the pathway or are in the pathway but are heldout are supplied as 
+  # labels to PLIER:::AUC 
+  # here, all genes are held out, so we pass the entire set and we do this
+  # for each combination of pathway (column in ord.holdout) and latent variable 
+  # (column in Z from the PLIER model)
+  auc.list <- foreach(path.iter = 1:ncol(ord.holdout)) %do% {
+    foreach(z.iter = 1:ncol(plier.result$Z)) %dopar% {
+      PLIER:::AUC(ord.holdout[, path.iter], plier.result$Z[, z.iter])
+    }
+  }
+  
+  # stop parallel backend
+  parallel::stopCluster(cl)
+  
+  # the outermost element of this list is the heldout pathways
+  names(auc.list) <- colnames(ord.holdout)
+  
+  # melting and wrangle to match the data.frames returned from PLIER::PLIER / 
+  # PLIER:::crossVal
+  auc.df <- reshape2::melt(auc.list) %>%
+    dplyr::filter(L3 %in% c("pval", "auc")) %>%
+    tidyr::spread(L3, value)
+  colnames(auc.df) <- c("LV index", "pathway", "AUC", "p-value")
+  
+  # reorder to match output and calculate FDR
+  auc.df <- auc.df %>%
+    dplyr::select(c("pathway", "LV index", "AUC", "p-value")) %>%
+    dplyr::mutate(FDR = PLIER:::BH(`p-value`))
+  
+  # return the full data.frame (no filtering for "significance")
+  return(auc.df)
+}
