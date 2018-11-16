@@ -1,0 +1,110 @@
+---
+title: "How well does MultiPLIER capture oncogenic pathways?"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+We've considered that a large sample size and a diverse set of biological 
+contexts and conditions might allow us to discover _novel_ biology--latent
+variables or patterns that are not associated with a pathway that was supplied
+to the model but _do_ participate in a coherent biological process.
+
+`PLIER` includes a prior information matrix for the [oncogenic pathways from
+MSigDB.](http://software.broadinstitute.org/gsea/msigdb/collections.jsp#C6)
+
+We did not include this in the prior information we used as input during 
+training.
+Thus, we can essentially treat this as a **holdout set** of pathways and ask
+if there are any latent variables significantly associated with the 
+oncogenic pathways learned by the model.
+
+We've adapted [`PLIER:::crossVal`](https://github.com/wgmao/PLIER/blob/a2d4a2aa343f9ed4b9b945c04326bebd31533d4d/R/Allfuncs.R#L175) 
+to do just that.
+See the `CalculateHoldoutAUC` function in `util/plier_util.R`.
+
+## Functions and directory set up
+
+```{r}
+# we need the PLIER library loaded so we can get the oncogenicPathways dataset
+library(PLIER)
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "27")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "27")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+### Custom functions
+
+We're specifically going to use the `CalculateHoldoutAUC` function.
+
+```{r}
+source(file.path("util", "plier_util.R"))
+```
+
+## Read in data and model
+
+```{r}
+# prior information matrix for the oncogenic pathways included with PLIER
+data("oncogenicPathways")
+
+# PLIER model being evaluated -- recount2/MultiPLIER
+plier.result <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                  "recount_PLIER_model.RDS"))
+
+```
+
+## Analysis
+
+First, we need to calculate the AUC for each heldout pathway-latent variable
+pair.
+
+```{r}
+auc.df <- CalculateHoldoutAUC(plier.result = plier.result,
+                              holdout.mat = oncogenicPathways)
+```
+
+### Cursory look at results
+
+Let's take a look at the results!
+
+```{r}
+head(auc.df)
+```
+
+Significant (FDR < 0.05) results only, sorted by LV and then by AUC
+
+```{r}
+sig.auc.df <- auc.df %>%
+  dplyr::filter(FDR < 0.05) %>%
+  dplyr::arrange(`LV index`, dplyr::desc(AUC))
+sig.auc.df
+```
+
+What proportion of the pathways are associated with a latent variable? 
+Using FDR < 0.05 as a cutoff, here.
+
+```{r}
+length(unique(sig.auc.df$pathway)) / ncol(oncogenicPathways)
+```
+
+Write the results to file
+
+```{r}
+readr::write_tsv(auc.df, 
+                 path = file.path(results.dir, 
+                                  "recount2_oncogenic_pathway_AUC.tsv"))
+```
+
+
+**Most oncogenic pathways are captured in the MultiPLIER model (FDR < 0.05)**
+
