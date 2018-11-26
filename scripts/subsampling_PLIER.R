@@ -1,10 +1,29 @@
-# Takes as arguments: prepped data, number of samples, number of repeats, 
-# a seed (optional), full path to output
-# For now, use the prepped data for recount (will be more efficient).
-# Any data _could_ be prepared the same way for use with this script. 
+# J. Taroni 2018
+# Given a list of prepared data saved as an RDS, this script will randomly 
+# select the specified number of samples and train a PLIER model. This process
+# will be repeated as many times is as specified using different random seeds.
+# The output is a list of each of the repeats (named by the seed used) saved as
+# an RDS file.
 # 
-# output: RDS that has _all_ the repeats in it!
-
+# USAGE:
+#   Rscript scripts/subsampling_PLIER.R \
+#     --input <PREPARED_DATA_RDS>
+#     --output <PATH_TO_OUTPUT_RDS>
+#     --num_samples <NUMBER_OF_SAMPLES>
+#     --repeats <NUMBER_OF_REPEATS>
+#     --seed <INITIAL_SEED>
+#  
+#  Arguments:
+#    input: an RDS file that contains a list with the following elements 
+#           (in order): an expression matrix, a prior information matrix, and 
+#           k value (from PLIER::num.pcs) -- the expression matrix and prior 
+#           information should have been prepared via PLIER::commonRows
+#    output: full path to the output RDS file that will contain a list of all
+#            repeats -- each element of the list contains the sampled expression
+#            matrix and the model
+#    num_samples: the number of samples to be randomly selected (default is 500)
+#    repeats: number of repeats (default is 5)
+#    seed: initial seed (default is 123)
 
 #### custom functions ----------------------------------------------------------
 
@@ -131,4 +150,3 @@ for (seed in seeds) {
 
 # save to file in the results directory
 saveRDS(object = model.list, file = output.file)
-
