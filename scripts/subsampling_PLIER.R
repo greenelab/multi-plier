@@ -123,9 +123,10 @@ for (seed in seeds) {
   smpl.exprs <- prepped.data[[1]][, sample.index]
   
   # rescaled exprs data & PLIER model
-  model.list[[seed]] <- PLIERWrapper(exprs = smpl.exprs,
-                                     pathway.mat = prepped.data[[2]],
-                                     seed = seed)
+  model.list[[as.character(seed)]] <- 
+    PLIERWrapper(exprs = smpl.exprs,
+                 pathway.mat = prepped.data[[2]],
+                 seed = seed)
 }
 
 # save to file in the results directory
