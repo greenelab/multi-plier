@@ -15,9 +15,9 @@
 #  
 #  Arguments:
 #    input: an RDS file that contains a list with the following elements 
-#           (in order): an expression matrix, a prior information matrix, and 
-#           k value (from PLIER::num.pcs) -- the expression matrix and prior 
-#           information should have been prepared via PLIER::commonRows
+#           (in order): an expression matrix, a prior information matrix -- 
+#           the expression matrix and prior information should have been 
+#           prepared via PLIER::commonRows
 #    output: full path to the output RDS file that will contain a list of all
 #            repeats -- each element of the list contains the sampled expression
 #            matrix and the model
