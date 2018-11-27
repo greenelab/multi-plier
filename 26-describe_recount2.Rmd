@@ -23,11 +23,52 @@ wget -O data/sample_info/metasra.v1-4.json http://metasra.biostat.wisc.edu/stati
 
 ```{r}
 # BiocInstaller::biocLite("SRAdb")
-library(SRAdb)
+# library(SRAdb)
 
 # magrittr pipe
 `%>%` <- dplyr::`%>%`
 ```
+
+Custom function for converting between the sample (e.g., `SRS`) accession codes
+and the sample names in recount2 which follow this pattern: `SRPxxxxxx.SRRxxxxx`
+
+```{r}
+ConvertToRecountSampleName <- function(sample.vector, conversion.df) {
+  # Takes a vector of sample accession codes and converts them to sample/column
+  # names for use with recount2 expression matrices
+  # 
+  # Args:
+  #   sample.vector: a vector of sample accession codes
+  #   conversion.df: a data.frame that provides the mappings between study,
+  #                  sample, and run accession codes -- must have "run", 
+  #                  "study", and "sample" column names
+  # 
+  # Returns:
+  #   sample.names: a vector of sample/column names for use with recount2 --
+  #                 these are the study and run accession codes separated with
+  #                 a `.`
+  
+  # error handling
+  check.colnames <- all(c("run", "study", "sample") %in% 
+                            colnames(conversion.df))
+  if (!check.colnames) {
+    stop("colnames(conversion.df) must contain 'run', 'study', 'sample'")
+  }
+  
+  # magrittr pipe, just in case
+  `%>%` <- dplyr::`%>%`
+  
+  # filter to only the samples in the supplied vector and then concatenate their
+  # study and sample accession codes
+  sample.names.df <- conversion.df %>%
+    dplyr::filter(`sample` %in% sample.vector) %>%
+    dplyr::mutate(recount.name = paste(study, run, sep = "."))
+ 
+  # return a vector of the recount2 names
+  return(sample.names.df$recount.name) 
+}
+```
+
 
 ## Read in data
 
@@ -92,6 +133,14 @@ the mapping between accessions.
 
 ```{sh}
 # md5sum SRAmetadb.sqlite
+```
+
+Because we've commented the above out for size concerns, we'll go ahead and 
+read `conversion.df` back in using the TSV file we've saved and committed.
+
+```{r}
+conversion.file <- file.path("data", "sample_info", "recount2_srr_srs_srp.tsv")
+conversion.df <- readr::read_tsv(conversion.file)
 ```
 
 ## Describe recount2
