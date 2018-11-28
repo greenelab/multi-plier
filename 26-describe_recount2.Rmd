@@ -16,7 +16,7 @@ To do so, we'll gather information from the following sources:
 ## Download MetaSRA data
 
 ```{sh}
-wget -O data/sample_info/metasra.v1-4.json http://metasra.biostat.wisc.edu/static/metasra_versions/v1.4/metasra.v1-4.json
+wget -N -O data/sample_info/metasra.v1-4.json http://metasra.biostat.wisc.edu/static/metasra_versions/v1.4/metasra.v1-4.json
 ```
 
 ## Libraries, functions
@@ -68,7 +68,6 @@ ConvertToRecountSampleName <- function(sample.vector, conversion.df) {
   return(sample.names.df$recount.name) 
 }
 ```
-
 
 ## Read in data
 
@@ -145,6 +144,9 @@ conversion.df <- readr::read_tsv(conversion.file)
 
 ## Describe recount2
 
+We'll also use these metadata to split the recount2 data into different training
+sets based on the biological conditions or sample types.
+
 ```{r}
 # only proceed with samples that are in the recount2 compendium that we used
 filtered.metasra <- metasra[which(names(metasra) %in% conversion.df$sample)]
@@ -171,7 +173,29 @@ sample.type <- lapply(filtered.metasra, function(x) x$`sample type`)
 table(unlist(sample.type))
 ```
 
-The bulk of samples are predicted to be cell lines and tissue samples.
+The bulk of samples are predicted to be cell lines and tissue samples. 
+Let's get a list of recount2 sample/column names for the cell line samples and
+the tissue samples.
+
+```{r}
+cell.line.samples <- names(sample.type[which(sample.type == "cell line")])
+cell.line.accessions <- ConvertToRecountSampleName(cell.line.samples,
+                                                   conversion.df)
+cell.line.file <- file.path("data", "sample_info", 
+                            "recount2_cell_line_accessions.tsv")
+write.table(cell.line.accessions, file = cell.line.file, sep = "\t", 
+            row.names = FALSE, col.names = FALSE, quote = FALSE)
+```
+
+```{r}
+tissue.samples <- names(sample.type[which(sample.type == "cell line")])
+tissue.accessions <- ConvertToRecountSampleName(tissue.samples,
+                                                   conversion.df)
+tissue.file <- file.path("data", "sample_info", 
+                            "recount2_tissue_accessions.tsv")
+write.table(tissue.accessions, file = tissue.file, sep = "\t", 
+            row.names = FALSE, col.names = FALSE, quote = FALSE)
+```
 
 ### Experimental Factor Ontology (EFO)
 
@@ -208,6 +232,21 @@ cancer.samples <-
 sum(unlist(cancer.samples))
 ```
 
+Let's write these accession codes to file.
+
+```{r}
+# just use the accession code, which is the name of the list for which the
+# element == TRUE
+cancer.samples <- names(cancer.samples[which(unlist(cancer.samples))])
+cancer.accessions <- 
+  ConvertToRecountSampleName(cancer.samples, 
+                             conversion.df)
+cancer.file <- file.path("data", "sample_info", 
+                            "recount2_cancer_accessions.tsv")
+write.table(cancer.accessions, file = cancer.file, sep = "\t", 
+            row.names = FALSE, col.names = FALSE, quote = FALSE)
+```
+
 ### What about treated samples?
 
 [`treatment`](https://www.ebi.ac.uk/ols/ontologies/efo/terms?short_form=EFO_0000727)
@@ -224,5 +263,45 @@ treatment.samples <-
   lapply(filtered.metasra, 
          function(x) any("EFO:0000727" %in% x$`mapped ontology terms`))
 sum(unlist(treatment.samples))
+```
+
+### Blood samples
+
+We'll want to train models _exclusively_ on blood samples and on 
+_everything-but-blood_ samples. 
+We're interested in this because the model learns leukocyte associated
+latent variables.
+
+We'll use the [Uberon](https://www.ebi.ac.uk/ols/ontologies/uberon) term for this 
+[`UBERON:0000178`](https://www.ebi.ac.uk/ols/ontologies/uberon/terms?short_form=UBERON_0000178)
+
+```{r}
+blood.samples <- 
+  lapply(filtered.metasra, 
+         function(x) any("UBERON:0000178" %in% x$`mapped ontology terms`))
+sum(unlist(blood.samples))
+```
+
+Convert the blood samples and the everything-but-blood samples to the recount2
+sample/column names and write to file.
+
+```{r}
+# just the accession codes
+blood.samples <- names(blood.samples[which(unlist(blood.samples))])
+blood.accessions <- ConvertToRecountSampleName(blood.samples, conversion.df)
+blood.file <- file.path("data", "sample_info", 
+                            "recount2_blood_accessions.tsv")
+write.table(blood.accessions, file = blood.file, sep = "\t", 
+            row.names = FALSE, col.names = FALSE, quote = FALSE)
+```
+
+```{r}
+not.blood.samples <- setdiff(names(filtered.metasra), blood.samples)
+not.blood.accessions <- ConvertToRecountSampleName(not.blood.samples, 
+                                                   conversion.df)
+not.blood.file <- file.path("data", "sample_info", 
+                            "recount2_other_tissues_accessions.tsv")
+write.table(not.blood.accessions, file = not.blood.file, sep = "\t", 
+            row.names = FALSE, col.names = FALSE, quote = FALSE)
 ```
 
