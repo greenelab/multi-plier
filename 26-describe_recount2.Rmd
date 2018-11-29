@@ -188,7 +188,7 @@ write.table(cell.line.accessions, file = cell.line.file, sep = "\t",
 ```
 
 ```{r}
-tissue.samples <- names(sample.type[which(sample.type == "cell line")])
+tissue.samples <- names(sample.type[which(sample.type == "tissue")])
 tissue.accessions <- ConvertToRecountSampleName(tissue.samples,
                                                    conversion.df)
 tissue.file <- file.path("data", "sample_info", 
