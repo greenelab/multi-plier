@@ -25,7 +25,7 @@ do
   Rscript scripts/subsampling_PLIER.R \
     --input $INPUT_DATA \
     --output $output_file \
-    --use_sample_list TRUE \
+    --use_sample_list \
     --sample_list $f
 
 done
