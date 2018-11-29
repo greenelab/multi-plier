@@ -51,3 +51,7 @@ SRAmetadb.sqlite
 
 # MetaSRA data
 data/sample_info/metasra.v1-4.json
+
+# PLIER models from subsampling/subsetting experiments -- some are too large
+# for git lfs
+models/
