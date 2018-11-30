@@ -1,0 +1,249 @@
+---
+title: "Tweaking display items: SLE U plot, AUC cut points"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+## Set up 
+
+```{r setup}
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+library(PLIER)
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+# color palette for PCA plots
+plot.color.pal <- c("#54FF9F", "#43CD80", "#2E8B57", "#006400", "#FF8C00",
+                    "#8B4500", "#000080")
+```
+
+## Read in data
+
+PLIER model
+
+```{r}
+# read in SLE WB PLIER model
+plier.file <- file.path("results", "05", "SLE-WB_PLIER_model.RDS")
+sle.plier <- readRDS(plier.file)
+```
+
+Sample-dataset mapping file
+
+```{r}
+# read sample dataset mapping file
+sd.file <- file.path("data", "sample_info", "sle-wb_sample_dataset_mapping.tsv")
+sd.df <- readr::read_tsv(sd.file)
+```
+
+## Plotting
+
+### `U` plot with selected latent variables
+
+```{r}
+pdf(file.path(plot.dir, "SLE_U_auc0.75_custom_col_index.pdf"))
+PLIER::plotU(sle.plier, auc.cutoff = 0.75, fontsize_row = 7,
+             fontsize_col = 7, indexCol = c(6, 69, 110, 87, 34, 2, 27, 122, 86,
+                                            25, 60, 52, 59, 109, 72, 8, 74))
+dev.off()
+```
+
+### AUC
+
+We picked `AUC > 0.75` as a cutoff for the "pathway-associated" latent variables
+in our SLE WB PLIER overview figure, but I can not recall how much we dug into
+what those AUC values look like overall.
+We'll explore this here, rather than `05-sle-wb-PLIER`, so we don't have to
+retrain the model.
+
+_Note: These AUC values are only calculated for LV with non-zero values in `U`._
+
+**What does the distribution of AUC values look like?**
+
+```{r}
+sle.plier$summary %>%
+  ggplot2::ggplot(ggplot2::aes(x = AUC)) +
+  ggplot2::geom_density(fill = "#000000", alpha = 0.2) +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("SLE WB Model LV AUC Values") +
+  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", hjust = 0.5),
+                 text = ggplot2::element_text(size = 15))
+```
+```{r}
+summary(sle.plier$summary$AUC)
+```
+
+We're a bit above the 3rd quartile at `0.75`. What are the 90th and 95th 
+percentiles?
+
+```{r}
+quantile(sle.plier$summary$AUC, 0.9)
+```
+
+```{r}
+quantile(sle.plier$summary$AUC, 0.95)
+```
+
+```{r}
+# this function is only intended to be run in this notebook/context!
+PlotPCAWrapper <- function(plier.result, sd.df, color.palette, 
+                           cutoff = 0.75) {
+  # plier.result: output of PLIER::PLIER
+  # sd.df: the sample-dataset mapping data.frame, contains a column named 
+  #        'SampleID', these sample ids need to match the column names of
+  #        the B matrix or this will not work!
+  # color.palette: color palette to be used with plots, this should be of 
+  #                length(number of datasets) or greater
+  # cutoff: what percentile should be used for the plots
+  
+  # since we'll produce _two_ plots for the cutoff -- those LVs above the 
+  # threshold and those LVs with AUC values less than or equal to the cutoff
+  # let's functionalize that
+  PCAtoDataFrame <- function(filt.b.matrix){
+    # PCA 
+    lv.pc <- prcomp(t(filt.b.matrix))
+    cum.var.exp <- cumsum(lv.pc$sdev^2 / sum(lv.pc$sdev^2))
+    
+    # PC1-2 in form suitable for ggplot2
+    lv.df <- as.data.frame(cbind(rownames(lv.pc$x),
+                                 lv.pc$x[, 1:2]))
+    colnames(lv.df)[1] <- "SampleID"
+    lv.df <- dplyr::full_join(lv.df, sd.df, by = "SampleID") %>%
+      dplyr::mutate(PC1 = as.numeric(as.character(PC1)),
+                    PC2 = as.numeric(as.character(PC2)),
+                    Dataset = factor(Dataset, 
+                                     levels = c("E-GEOD-39088",
+                                                "E-GEOD-61635",
+                                                "E-GEOD-72747",
+                                                "E-GEOD-11907",
+                                                "E-GEOD-49454",
+                                                "E-GEOD-65391",
+                                                "E-GEOD-78193")))
+    
+    return(list(lv.df = lv.df, cum.var.exp = cum.var.exp))
+  }
+  
+  # wrapper for the plots themselves since there are two!
+  PlotScatterplot <- function(lv.df, color.pal, plot.title,
+                              cum.var.exp) {
+    # where lv.df and cum.var.exp are the output of PCAtoDataFrame
+    ggplot2::ggplot(lv.df, ggplot2::aes(x = PC1, y = PC2, 
+                                            colour = Dataset)) +
+      ggplot2::geom_point(alpha = 0.5) +
+      ggplot2::scale_color_manual(values = color.pal) +
+      ggplot2::theme_bw() +
+      ggplot2::labs(x = paste0("PC1 (cum var exp = ", 
+                               round(cum.var.exp[1], 3), ")"),
+                    y = paste0("PC2 (cum var exp = ", 
+                               round(cum.var.exp[2], 3), ")"), 
+                    title = plot.title) +
+      ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, 
+                                                        face = "bold"),
+                     text = ggplot2::element_text(size = 12),
+                     legend.position = "none")
+  }
+  
+  # using the user-specified percentile, identify the LVs with values higher
+  # than that cutoff 
+  auc.cutoff.value <- quantile(plier.result$summary$AUC, cutoff)
+  lvs.to.keep <- unique(plier.result$summary$`LV index`[
+    which(plier.result$summary$AUC > auc.cutoff.value)
+  ])
+  
+  # filter the B matrix to only the LVs above the threshold + plot
+  keep.b.matrix <- plier.result$B[as.integer(lvs.to.keep), ]
+  keep.lv.df <- PCAtoDataFrame(filt.b.matrix = keep.b.matrix)
+  keep.plot <- PlotScatterplot(keep.lv.df$lv.df, 
+                               color.pal = color.palette,
+                               plot.title = paste("Latent Variables AUC >",
+                                                  round(auc.cutoff.value, 3)),
+                               cum.var.exp = keep.lv.df$cum.var.exp)
+  
+  # other LVs
+  other.b.matrix <- plier.result$B[-as.integer(lvs.to.keep), ]
+  other.lv.df <- PCAtoDataFrame(filt.b.matrix = other.b.matrix)
+  other.plot <- PlotScatterplot(other.lv.df$lv.df, 
+                                color.pal = color.palette,
+                                plot.title = paste("Latent Variables AUC <=",
+                                                   round(auc.cutoff.value, 3)),
+                                cum.var.exp = other.lv.df$cum.var.exp)
+  
+  # return a list of two plots
+  return(list(above.plot = keep.plot, other.plot = other.plot))   
+}
+```
+
+```{r}
+cutoff.values <- c(0.75, 0.9, 0.95)
+plot.lists <- lapply(cutoff.values,
+                     function(x) {
+                       PlotPCAWrapper(plier.result = sle.plier,
+                                      sd.df = sd.df,
+                                      color.palette = plot.color.pal,
+                                      cutoff = x)
+                     })
+```
+
+### Multipanel plot
+
+We'll start the panel labeling with **B** because panel **A** will be the
+pairs plot from PCA on the gene-level expression values from this compendium.
+
+```{r}
+# wrapper for the two panels for each percentile cut off
+TwoPanelWrapper <- function(plot.list, panel.labels = c("B", "C"),
+                            side.label = "75th percentile") {
+  two.panel <- cowplot::plot_grid(plotlist = plot.list, 
+                                  align = "h", ncol = 2, scale = 0.95,
+                                  labels = panel.labels)
+  plot.label <- cowplot::ggdraw() + 
+    cowplot::draw_label(side.label, fontface = "bold", size = 20, 
+                        angle = -90)
+  return(cowplot::plot_grid(two.panel, plot.label, align = "h", ncol = 2, 
+                            labels = NULL, rel_widths = c(1, 0.1)))
+}
+```
+
+75th percentile
+
+```{r}
+seventy.fifth <- TwoPanelWrapper(plot.list = plot.lists[[1]],
+                                 panel.labels = c("B", "C"),
+                                 side.label = "75th percentile")
+seventy.fifth
+```
+
+90th percentile
+
+```{r}
+ninetieth <- TwoPanelWrapper(plot.list = plot.lists[[2]], 
+                             panel.labels = c("D", "E"),
+                             side.label = "90th percentile")
+```
+
+95th percentile
+
+```{r}
+ninety.fifth <- TwoPanelWrapper(plot.list = plot.lists[[3]], 
+                                panel.labels = c("F", "G"),
+                                side.label = "95th percentile")
+```
+
+Final plot! 
+
+```{r}
+pdf(file.path(plot.dir, "SLE_PCA_different_cutpoints.pdf"), width = 8.5,
+    height = 11)
+cowplot::plot_grid(plotlist = list(seventy.fifth, ninetieth, ninety.fifth), 
+                   ncol = 1, nrow = 3)
+dev.off()
+```
+
