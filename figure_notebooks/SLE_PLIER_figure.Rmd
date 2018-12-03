@@ -48,6 +48,9 @@ sd.df <- readr::read_tsv(sd.file)
 
 ### `U` plot with selected latent variables
 
+We supplied column indices for LVs that we focus on in the main text of the 
+paper.
+
 ```{r}
 pdf(file.path(plot.dir, "SLE_U_auc0.75_custom_col_index.pdf"))
 PLIER::plotU(sle.plier, auc.cutoff = 0.75, fontsize_row = 7,
@@ -136,7 +139,7 @@ PlotPCAWrapper <- function(plier.result, sd.df, color.palette,
                               cum.var.exp) {
     # where lv.df and cum.var.exp are the output of PCAtoDataFrame
     ggplot2::ggplot(lv.df, ggplot2::aes(x = PC1, y = PC2, 
-                                            colour = Dataset)) +
+                                        colour = Dataset)) +
       ggplot2::geom_point(alpha = 0.5) +
       ggplot2::scale_color_manual(values = color.pal) +
       ggplot2::theme_bw() +
