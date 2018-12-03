@@ -25,7 +25,7 @@
 #    Rscript scripts/subsampling_PLIER.R \
 #      --input <PREPARED_DATA_RDS> \
 #      --output <PATH_TO_OUTPUT_RDS> \
-#      --use_sample_list TRUE \
+#      --use_sample_list \
 #      --sample_list <PATH_TO_TSV_FILE>
 #  
 #  Arguments:
@@ -107,7 +107,7 @@ option.list = list(
   make_option(c("-s", "--seed"), type = "integer", default = 123,
               help = "Number of repeats to perform"),
   make_option(c("-u", "--use_sample_list"), type = "logical", default = FALSE,
-              help = "Number of repeats to perform"),
+              action = "store_true", help = "Number of repeats to perform"),
   make_option(c("-l", "--sample_list"), type = "character", default = NULL,
               help = "TSV file that contains samples to subset to")
 )
@@ -160,8 +160,8 @@ if (use.sample.list) {
   smpl.exprs <- prepped.data[[1]][, sample.index]
   
   plier.results <- PLIERWrapper(exprs = smpl.exprs,
-                              pathway.mat = prepped.data[[2]],
-                              seed = initial.seed)
+                                pathway.mat = prepped.data[[2]],
+                                seed = initial.seed)
   
   # save to file
   saveRDS(object = plier.results, file = output.file)

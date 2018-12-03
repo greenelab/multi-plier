@@ -192,7 +192,7 @@ tissue.samples <- names(sample.type[which(sample.type == "tissue")])
 tissue.accessions <- ConvertToRecountSampleName(tissue.samples,
                                                    conversion.df)
 tissue.file <- file.path("data", "sample_info", 
-                            "recount2_tissue_accessions.tsv")
+                         "recount2_tissue_accessions.tsv")
 write.table(tissue.accessions, file = tissue.file, sep = "\t", 
             row.names = FALSE, col.names = FALSE, quote = FALSE)
 ```
@@ -242,7 +242,7 @@ cancer.accessions <-
   ConvertToRecountSampleName(cancer.samples, 
                              conversion.df)
 cancer.file <- file.path("data", "sample_info", 
-                            "recount2_cancer_accessions.tsv")
+                         "recount2_cancer_accessions.tsv")
 write.table(cancer.accessions, file = cancer.file, sep = "\t", 
             row.names = FALSE, col.names = FALSE, quote = FALSE)
 ```
@@ -290,7 +290,7 @@ sample/column names and write to file.
 blood.samples <- names(blood.samples[which(unlist(blood.samples))])
 blood.accessions <- ConvertToRecountSampleName(blood.samples, conversion.df)
 blood.file <- file.path("data", "sample_info", 
-                            "recount2_blood_accessions.tsv")
+                        "recount2_blood_accessions.tsv")
 write.table(blood.accessions, file = blood.file, sep = "\t", 
             row.names = FALSE, col.names = FALSE, quote = FALSE)
 ```
