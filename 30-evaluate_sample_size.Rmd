@@ -1,0 +1,179 @@
+---
+title: "Evaluating subsampling: sample size 'sweep'"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In `29-train_models_different_sample_size.sh`, we trained models of different 
+sample sizes (5x repeats with different random seeds). 
+Here, we're interested in evaluating these models.
+Specifically, we want to know:
+
+* **How many latent variables were learned by each model?** 
+  We expect this number to increase with sample size.
+* **Of the pathway supplied to the model during training, what proportion of 
+  these are captured by the model?**
+  (We refer to this measure as "pathway coverage.")
+  We also expect this number to go up with sample size, at least initially, and
+  for this metric to be somewhat stable across repeats, based on the results
+  displayed/plotted in `17-plotting_repeat_evals` (calculated in 
+  `15-evaluate_subsampling`).
+* **What pathways are captured?**
+  Here, again we're concerned with pathways that were supplied to the model 
+  during training.
+  We may want to do this evaluation alongside the biological contexts 
+  evaluations (i.e., models trained via 
+  `28-train_different_biological_contexts.sh`) rather than in this notebook.
+* **What oncogenic pathways are captured by the model?**
+  The [oncogenic pathways from MSigDB](software.broadinstitute.org/gsea/msigdb/genesets.jsp?collection=C6) 
+  were _not_ supplied to the model during training, so this is a holdout set.
+  I hypothesize that models trained on more samples will do a bit better at
+  capturing these heldout pathways.
+
+## Set up
+
+#### Custom functions + libraries
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# this is required to get the oncogenic pathways -- we're going to use this
+# as our holdout set here
+library(PLIER)
+```
+
+#### Directory setup
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "30")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "30")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+#### Models to read in
+
+All models we'll evaluate are in `models/`
+
+```{r}
+models.dir <- "models"
+# we want all the models with 'subsampled' in the file name -- these are the
+# sample size evaluations
+model.files <- list.files(models.dir, pattern = "subsampled", full.names = TRUE)
+model.files
+```
+
+## Evaluations
+
+We're going to use the oncogenic pathways that come with PLIER as our holdout
+set.
+
+```{r}
+# load in holdout set
+data("oncogenicPathways")
+
+# now calculate pathway coverage, number of latent variables, and the AUC
+# for the oncogenic pathways
+results.list <- lapply(model.files, # for each sample size (5 repeats)
+                       function(x) {
+                         plier.models <- readRDS(x)  # read in list of models
+                         # for each individual repeat
+                         lapply(plier.models, function(y) {
+                           EvalWrapperWithHoldout(plier.model = y$PLIER,
+                                                  holdout.matrix = oncogenicPathways)
+                         })
+                       })
+
+# we'll name the elements of the list based on their sample size, which we 
+# can extract from the filenames themselves
+names(results.list) <- sub(".RDS", "", sub(".*[_]", "", model.files))
+```
+
+### Heldout pathways
+
+```{r}
+# extract the heldout results element -- the structure of the results list is
+# sample size -> repeat -> pathway.coverage, num.lvs, heldout.results
+# we want all the heldout.results from results.list
+holdout.results <- lapply(results.list, 
+                          function(x) lapply(x, function(y) y$heldout.results))
+
+# now we want the results in the form of a data.frame, where we include 
+# information about the sample size as well as the random seed used to generate
+# that repeat's results
+holdout.df <- 
+  dplyr::bind_rows(
+    # for each sample size, create a data.frame of all the holdout results and
+    # include the random seed as an identifier
+    lapply(holdout.results, 
+           function(x) dplyr::bind_rows(x, .id = "seed")), 
+    # use the sample size as an identifier when we bind all the data.frames 
+    # together
+    .id = "sample_size" 
+  )
+head(holdout.df)
+```
+
+```{r}
+# write to file
+holdout.file <- file.path(results.dir, "subsampled_oncogenic_pathways_AUC.tsv")
+readr::write_tsv(holdout.df, path = holdout.file)
+```
+
+### Number of latent variables
+
+```{r}
+# first extract the num.lvs elements, then melt into a data.frame
+num.lvs.df <- reshape2::melt(lapply(results.list,
+                                    function(x) lapply(x, 
+                                                       function(y) y$num.lvs)),
+                             value.name = "number_of_latent_variables")
+colnames(num.lvs.df)[2:3] <- c("seed", "sample_size")
+num.lvs.df
+```
+
+```{r}
+# write to file
+num.lvs.file <- file.path(results.dir, "subsampled_number_of_lvs.tsv")
+readr::write_tsv(num.lvs.df, path = num.lvs.file)
+```
+
+### Pathway coverage
+
+```{r}
+# extract only the pathway.coverage elements
+pathway.coverage.list <- 
+  lapply(results.list, 
+         function(x) lapply(x, function(y) y$pathway.coverage))
+# melt into data.frame
+coverage.df <- reshape2::melt(pathway.coverage.list)
+# since we've melted from a list, rename the columns 
+colnames(coverage.df)[2:4] <- c("metric", "seed", "sample_size")
+
+# we're only really interested in 2 out of 3 of the metrics calculated by
+# GetPathwayCoverage -- filter to only those and recode 
+coverage.df <- coverage.df %>%
+  dplyr::filter(metric %in% c("pathway", "lv")) %>%
+  dplyr::mutate(metric = 
+                  dplyr::case_when(
+                    (metric == "lv") ~ 
+                      "LV associated with pathways",
+                    (metric =="pathway") ~ "pathway coverage"
+                  ))
+head(coverage.df)
+```
+
+```{r}
+# write to file!
+coverage.file <- file.path(results.dir, "subsampled_pathway_coverage.tsv")
+readr::write_tsv(coverage.df, path = coverage.file)
+```
+
