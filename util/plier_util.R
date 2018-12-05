@@ -481,3 +481,48 @@ CalculateHoldoutAUC <- function(plier.result, holdout.mat, ncores = 6) {
   # return the full data.frame (no filtering for "significance")
   return(auc.df)
 }
+
+EvalWrapperWithHoldout <- function(plier.model, holdout.matrix, 
+                                   ncores = 6, fdr.cutoff = 0.05) {
+  # Given a PLIER model, calculate pathway coverage (w/ GetPathwayCoverage), 
+  # find the number of latent variables in the model, and calculate the AUC 
+  # for the heldout pathways in holdout.matrix (w/ CalculateHoldoutAUC); 
+  # return a list of these results
+  #
+  # Args:
+  #  plier.model: output of main PLIER function (PLIER::PLIER)
+  #  holdout.matrix: a prior information matrix, formatted as is passed to
+  #                  PLIER::PLIER -- genes are rows, pathways are columns, 
+  #                  values are binary (0/1) where 1 indicates that a gene 
+  #                  is in a pathway
+  #   ncores: number of cores to use for parallel backend in holdout AUC 
+  #           calculations, 6 by default
+  #   fdr.cutoff: what is the FDR cutoff for significance (for pathway
+  #               coverage calculations)? 0.05 by default
+  #   
+  # Returns a list with the following elements:
+  #    pathway.coverage: output of GetPathwayCoverage; see that function's
+  #                      documentation for more information
+  #    num.lvs: number of latent variables in the model
+  #    heldout.results: output of CalculatedHoldoutAUC; see that function's
+  #                     documentation for more information
+  #
+  
+  # pathway coverage
+  pathway.coverage <- GetPathwayCoverage(plier.results = plier.model, 
+                                         fdr.cutoff = fdr.cutoff)
+  
+  # number of latent variables
+  num.lvs <- nrow(plier.model$B)
+  
+  # AUC, FDR, etc. for pathways in holdout.matrix
+  heldout.results <- CalculateHoldoutAUC(plier.result = plier.model,
+                                         holdout.mat = holdout.matrix,
+                                         ncores = ncores)
+  
+  # return a list of all results
+  return(list(pathway.coverage = pathway.coverage,
+              num.lvs = num.lvs,
+              heldout.results = heldout.results))
+  
+}
