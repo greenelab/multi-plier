@@ -1,0 +1,155 @@
+---
+title: "Evaluating subsampling: biological context"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In `28-training_different_biological_contexts.sh`, we trained models on 
+datasets that were comprised of the following (predicted by 
+[MetaSRA](http://metasra.biostat.wisc.edu/); see `26-describe_recount2`) 
+biological contexts/conditions:
+
+* Cancer
+* Cell line samples
+* Tissue samples
+* Blood samples
+* Everything-but-blood samples
+
+As in `30-evaluate_sample_size`, we're concerned with the pathway coverage for
+pathways/gene sets included in the model, how well the model captures pathways
+that were heldout during training (e.g., oncogenic pathways from MSigDB), and
+the number of latent variables in each model.
+
+## Set up
+
+#### Custom functions + libraries
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# this is required to get the oncogenic pathways -- we're going to use this
+# as our holdout set here
+library(PLIER)
+```
+
+#### Directory setup
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "31")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "31")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+#### Models to read in
+
+All models we'll evaluate are in `models/`
+
+```{r}
+models.dir <- "models"
+# we want all the models with 'accessions' in the file name -- these are the
+# models trained on different biological contexts
+model.files <- list.files(models.dir, pattern = "accessions", full.names = TRUE)
+model.files
+```
+
+## Evaluations
+
+We're going to use the oncogenic pathways that come with PLIER as our holdout
+set.
+These are structured differently than the sample size R objects because we have
+not performed any repeats.
+
+```{r}
+# load in holdout set
+data("oncogenicPathways")
+
+# now calculate pathway coverage, number of latent variables, and the AUC
+# for the oncogenic pathways
+results.list <- lapply(model.files, # for each biological context
+                       function(x) {
+                         plier.results <- readRDS(x)  # read in model
+                         EvalWrapperWithHoldout(plier.model = plier.results$PLIER,
+                                                holdout.matrix = oncogenicPathways)
+                       })
+
+# we'll name the elements of the list based on their training set, which we 
+# can extract from the filenames themselves
+names(results.list) <- stringr::str_match(model.files, 
+                                          "recount2_(.*?)_accessions")[, 2]
+```
+
+### Holdout sets
+
+Wrangle the holdout set results
+
+```{r}
+# we want all the holdout results in a single data.frame, where we include 
+# information about the biological context
+holdout.df <- dplyr::bind_rows(lapply(results.list,
+                                      function(x) x$heldout.results), 
+                               .id = "biological_context")
+head(holdout.df)
+```
+
+```{r}
+# write to file
+holdout.file <- file.path(results.dir, 
+                          "biological_contexts_oncogenic_pathways_AUC.tsv")
+readr::write_tsv(holdout.df, path = holdout.file)
+```
+
+### Number of latent variables
+
+```{r}
+# first extract the num.lvs elements, then melt into a data.frame
+num.lvs.df <- reshape2::melt(lapply(results.list,
+                                    function(x) x$num.lvs),
+                             value.name = "number_of_latent_variables")
+colnames(num.lvs.df)[2] <- "biological_context"
+num.lvs.df
+```
+
+```{r}
+# write to file
+num.lvs.file <- file.path(results.dir, "biological_context_number_of_lvs.tsv")
+readr::write_tsv(num.lvs.df, path = num.lvs.file)
+```
+
+### Pathway coverage
+
+```{r}
+# melt pathway.coverage elements into a data.frame
+coverage.df <- reshape2::melt(lapply(results.list, 
+                                     function(x) x$pathway.coverage), 
+                              pathway.coverage.list)
+# since we've melted from a list, rename the columns 
+colnames(coverage.df)[2:3] <- c("metric", "biological_context")
+
+# we're only really interested in 2 out of 3 of the metrics calculated by
+# GetPathwayCoverage -- filter to only those and recode 
+coverage.df <- coverage.df %>%
+  dplyr::filter(metric %in% c("pathway", "lv")) %>%
+  dplyr::mutate(metric = 
+                  dplyr::case_when(
+                    (metric == "lv") ~ 
+                      "LV associated with pathways",
+                    (metric =="pathway") ~ "pathway coverage"
+                  ))
+head(coverage.df)
+```
+
+```{r}
+# write to file!
+coverage.file <- file.path(results.dir, 
+                           "biological_context_pathway_coverage.tsv")
+readr::write_tsv(coverage.df, path = coverage.file)
+```
