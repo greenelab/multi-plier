@@ -34,6 +34,9 @@ data/expression_data/GSE18885_series_matrix.txt
 data/expression_data/NARES_SCANfast_ComBat.pcl
 data/expression_data/SLE_WB_all_microarray_QN_zto_before.pcl
 data/expression_data/ERCB_Glom_CustCDF19_forVCRC.txt
+data/expression_data/DIPG_E-GEOD-26576_hgu133plus2_SCANfast.pcl
+data/expression_data/GSE50021_series_matrix.txt
+data/expression_data/GSE37382_SCAN.pcl
 data/sample_info/E-GEOD-39088.sdrf.txt
 data/sample_info/E-GEOD-65391.sdrf.txt
 data/sample_info/E-GEOD-78193.sdrf.txt
@@ -41,6 +44,8 @@ data/sample_info/E-MTAB-2452.sdrf.txt
 data/sample_info/NARES_demographic_data.tsv
 data/sample_info/sle-wb_sample_dataset_mapping.tsv
 data/sample_info/ERCB_glom_diagnosis.tsv
+data/sample_info/E-GEOD-26576.sdrf.txt
+data/sample_info/GSE37382_cleaned_metadata.tsv
 
 # private data
 data/kidney/
