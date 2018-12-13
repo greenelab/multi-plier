@@ -1,0 +1,93 @@
+---
+title: "DIPG: applying MultiPLIER"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+Apply the MultiPLIER (recount2) model to the two datasets prepped in 
+`34-DIPG_data_cleaning`.
+
+## Set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+```
+
+Directories for this notebook
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "35")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "35")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+### recount2 PLIER model
+
+```{r}
+recount.file <- file.path("data", "recount2_PLIER_data", 
+                          "recount_PLIER_model.RDS")
+recount.plier <- readRDS(recount.file)
+```
+
+### DIPG Expression data
+
+```{r}
+# we want this is matrix form, with the gene symbols as rownames
+gse50021 <- readr::read_tsv(file.path("data", "expression_data", 
+                                      "GSE50021_mean_agg.pcl")) %>%
+  as.data.frame() %>%
+  tibble::column_to_rownames("Gene") %>%
+  as.matrix()
+```
+
+```{r}
+e.geod.file <- 
+  file.path("data", "expression_data", 
+            "DIPG_E-GEOD-26576_hgu133plus2_SCANfast_with_GeneSymbol.pcl")
+gse26576 <- readr::read_tsv(e.geod.file) %>%
+  dplyr::select(-EntrezID) %>%
+  as.data.frame() %>%
+  tibble::column_to_rownames("GeneSymbol") %>%
+  as.matrix()
+```
+
+## Apply the model
+
+### `GSE50021`
+
+```{r}
+gse50021.b <- GetNewDataB(exprs.mat = gse50021,
+                          plier.model = recount.plier)
+```
+
+Save the `B` matrix to file
+
+```{r}
+saveRDS(gse50021.b, file = file.path(results.dir, "GSE50021_recount2_B.RDS"))
+```
+
+### `E-GEOD-26576`
+
+Now the next expression dataset
+
+```{r}
+gse26576.b <- GetNewDataB(exprs.mat = gse26576,
+                          plier.model = recount.plier)
+```
+
+Save to file
+
+```{r}
+saveRDS(gse26576.b, file = file.path(results.dir, 
+                                     "E-GEOD-26576_recount2_B.RDS"))
+```
+
