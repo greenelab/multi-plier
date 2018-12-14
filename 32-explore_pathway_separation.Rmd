@@ -11,7 +11,7 @@ output:
 We've noted that pathways or genesets that are similar to one another, such as 
 cell types of the myeloid lineage (e.g., neutrophils and monocytes/macrophages),
 can tend to get "lumped together" in PLIER models trained on training sets with
-smaller sample sizes.
+smaller sample sizes or less relevant biological contexts.
 In contrast, the MultiPLIER model (~37K samples) tends to "separate" similar 
 pathways into different latent variables.
 (See `06-sle-wb_cell_type` and `07-sle_cell_type_recount2_model`.)
@@ -137,12 +137,22 @@ models.dir <- "models"
 
 #### Input
 
+Models from the conditions being tested: sample size and biological context
+
 ```{r}
-# will be working with the models with different sample sizes -- "subsampled" is
-# in the RDS object file names
+# models with different sample sizes -- "subsampled" is in the RDS object 
+# file names
 size.model.files <- list.files(models.dir, pattern = "subsampled", 
                                full.names = TRUE)
 size.model.files
+```
+
+```{r}
+# models for different biological contexts -- "accessions" is in the RDS object 
+# file names
+context.model.files <- list.files(models.dir, pattern = "accessions",
+                                  full.names = TRUE)
+context.model.files
 ```
 
 Also want the MultiPLIER / full `recount2` model
@@ -151,7 +161,6 @@ Also want the MultiPLIER / full `recount2` model
 recount2.model.file <- file.path("data", "recount2_PLIER_data", 
                                  "recount_PLIER_model.RDS")
 ```
-
 
 ## Sets of pathways for pathway separation
 
@@ -178,8 +187,6 @@ monocyte.set <- c("IRIS_Monocyte-Day0", "IRIS_Monocyte-Day1",
 
 Molecular processes we would associate with proliferating cells, namely the
 G1 and G2 phases of the cell cycle.
-(I'm not entirely sure this is the best choice as it may be too 
-specific/narrow?)
 
 ```{r}
 g1.set <- c("REACTOME_G1_S_TRANSITION", "REACTOME_M_G1_TRANSITION",
@@ -301,7 +308,67 @@ size.heatmap
 
 ## Biological context
 
-Coming soon!
+```{r}
+# detect for pathway separation
+context.results <- lapply(context.model.files,  # for each context (5x repeat)
+                       function(x) {
+                         # read in the list of 5 models
+                         models.list <- readRDS(x)
+                         lapply(models.list, 
+                                function(y) {
+                                  # we need to specifically extract the `PLIER`
+                                  # element of the list and test all pairs
+                                  # of pathways
+                                  AllPairs(plier.model = y$PLIER)
+                                })
+                       })
+
+# we'll name the elements of the list based on their training set, which we 
+# can extract from the filenames themselves
+names(context.results) <- 
+  stringr::str_match(context.model.files, "recount2_(.*?)_accessions")[, 2]
+```
+
+```{r}
+# melt and bind the pathway separation results, using the sample size as an
+# identifier
+context.results.df <- dplyr::bind_rows(lapply(context.results, 
+                                           reshape2::melt), 
+                                    .id = "biological_context")
+colnames(context.results.df)[3:4] <- c("pathway", "seed")
+```
+
+Wrangle data for heatmap
+
+```{r}
+context.df <- context.results.df %>%
+  # for each biological context, pathway pair
+  dplyr::group_by(biological_context, pathway) %>%
+  # count how many models where there's separation
+  dplyr::summarize(model_count = sum(value)) %>%
+  # spread the columns
+  tidyr::spread(biological_context, model_count) %>%
+  # reorder such that sample size is increasing
+  dplyr::select(c("pathway", "blood", "cancer", "tissue", "cell_line", 
+                  "other_tissues")) %>%
+  # the pathway names should be rownames rather than an individual column
+  tibble::column_to_rownames("pathway") %>%
+  as.data.frame()
+```
+
+```{r}
+context.heatmap <- 
+  ComplexHeatmap::Heatmap(as.matrix(context.df),
+                          cluster_rows = FALSE,
+                          cluster_columns = FALSE,
+                          row_names_side = "left",
+                          column_names_side = "top",
+                          col = colorRampPalette(c("white", "blue3"))(6),
+                          rect_gp = grid::gpar(col = "black"),
+                          show_heatmap_legend = FALSE,
+                          name = "number of models",
+                          show_row_names = FALSE)
+```
 
 ## MultiPLIER
 
@@ -340,8 +407,8 @@ multiplier.heatmap <-
 ## Final plotting
 
 ```{r}
-heatmap.list <- size.heatmap + multiplier.heatmap
-pdf(file.path(plot.dir, "size_multiplier_separation.pdf"))
+heatmap.list <- size.heatmap + context.heatmap + multiplier.heatmap 
+pdf(file.path(plot.dir, "multiplier_separation.pdf"))
 ComplexHeatmap::draw(heatmap.list)
 dev.off()
 ```
