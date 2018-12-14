@@ -6,8 +6,8 @@
 #   random seeds. The output is a list of each of the repeats (named by the seed 
 #   used) saved as an RDS file.
 # - Given a list (TSV) of sample names/accession codes for the prepared data,
-#   subset the expression data to these samples and train a model. This is not
-#   repeated as we have found the models to be pretty stable.
+#   subset the expression data to these samples and train the number of
+#   models specified by number of repeats, each with different seeds.
 # 
 # USAGE:
 #   
@@ -26,7 +26,8 @@
 #      --input <PREPARED_DATA_RDS> \
 #      --output <PATH_TO_OUTPUT_RDS> \
 #      --use_sample_list \
-#      --sample_list <PATH_TO_TSV_FILE>
+#      --sample_list <PATH_TO_TSV_FILE> \
+#      --repeats <NUMBER_OF_REPEATS>
 #  
 #  Arguments:
 #    input: an RDS file that contains a list with the following elements 
@@ -47,7 +48,8 @@
 
 #### custom functions ----------------------------------------------------------
 
-PLIERWrapper <- function(exprs, pathway.mat, seed = 12345) {
+PLIERWrapper <- function(exprs, pathway.mat, seed = 12345,
+                         return.exprs = TRUE) {
   # "Pared down" PLIER wrapper function. The one we use elsewhere includes
   # collapsing to common genes between the expression matrix and the gene sets
   # that are included with the PLIER package -- we already have this information
@@ -59,10 +61,13 @@ PLIERWrapper <- function(exprs, pathway.mat, seed = 12345) {
   #                genes and ordering as exprs
   #   seed: an integer to be supplied to set.seed() for reproducibility 
   #         purposes, default is 12345
+  #   return.exprs: logical, should the expression matrix be returned by
+  #                 this function? default is TRUE -- it's useful to retain this
+  #                 matrix for random subsampling experiments
   # 
   # Returns
-  #   a list that contains the row-normalized expression data and the PLIER
-  #   output
+  #   a list that contains the row-normalized expression data if 
+  #   return.exprs is TRUE and the PLIER output
   
   # trouble with glmnet otherwise
   library(PLIER)
@@ -85,8 +90,15 @@ PLIERWrapper <- function(exprs, pathway.mat, seed = 12345) {
   # PLIER main function + return results
   plier.res <- PLIER::PLIER(as.matrix(exprs), as.matrix(pathway.mat),
                             k = round((set.k + set.k * 0.3), 0), trace = TRUE)
-  return(list("exprs" = exprs,
-              "PLIER" = plier.res))
+  
+  # if return.exprs == TRUE, then the returned list should include the input
+  # expression matrix
+  if (return.exprs) {  
+    return(list("exprs" = exprs,
+                "PLIER" = plier.res))
+  } else {
+    return(list("PLIER" = plier.res))
+  }
   
 }
 
@@ -141,6 +153,12 @@ dir.create(output.directory, showWarnings = FALSE, recursive = TRUE)
 # the pathways prior information matrix is the second element of prepped.data
 prepped.data <- readRDS(input.file)
 
+# set seed for reproducibility
+set.seed(initial.seed)
+
+# we'll need seeds for each of the repeats
+seeds <- sample(1:10000, num.repeats)
+
 # subsetting to using a list of samples
 if (use.sample.list) {
   
@@ -159,20 +177,23 @@ if (use.sample.list) {
   # expression matrix that includes the specified samples
   smpl.exprs <- prepped.data[[1]][, sample.index]
   
-  plier.results <- PLIERWrapper(exprs = smpl.exprs,
-                                pathway.mat = prepped.data[[2]],
-                                seed = initial.seed)
+  # for each seed/repeat, train a model
+  model.list <- lapply(seeds, 
+                      function(x) {
+                        # if we're using a list, the expression matrix will
+                        # be the same for each repeat, so to reduce file size
+                        # we set return.exprs to FALSE
+                        PLIERWrapper(exprs = smpl.exprs,
+                                     pathway.mat = prepped.data[[2]],
+                                     seed = x,
+                                     return.exprs = FALSE)
+                      })
+  names(model.list) <- seeds
   
   # save to file
-  saveRDS(object = plier.results, file = output.file)
+  saveRDS(object = model.list, file = output.file)
   
 } else {  # Random subsampling
-  
-  # set seed for reproducibility
-  set.seed(initial.seed)
-  
-  # we'll need seeds for each of the repeats
-  seeds <- sample(1:10000, num.repeats)
   
   # how many total samples are in the recount2 compendium we're using?
   num.cols <- ncol(prepped.data[[1]])

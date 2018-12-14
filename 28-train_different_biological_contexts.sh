@@ -13,7 +13,7 @@ arr=($SAMPLE_LIST_DIR/*accessions.tsv)
 for f in "${arr[@]}"; 
 do
   
-  echo "Training model for ${f}"
+  echo "Training models for ${f}"
   
   # the output file should be the same file name as the sample list file, but
   # we're removing .tsv extension and replacing with "_PLIER_model.RDS" and 
