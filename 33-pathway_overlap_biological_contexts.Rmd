@@ -1,0 +1,164 @@
+---
+title: "What pathways are captured in models trained on different biological 
+contexts?"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+A pathway will be considered captured or represented when training on a 
+particular biological context if the majority of models have at least one 
+latent variable significantly associated (we'll use `FDR < 0.05`) with it.
+We have trained 5 models initialized with different random seeds for each 
+biological context (identical training set). 
+Thus, if 3 or more models have a latent variable associated with a pathway,
+that pathway is to be considered captured in that biological context.
+
+## Set up 
+
+```{r}
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+```
+
+```{r}
+# for a list of plier models (e.g., series of repeats; output of
+# scripts/subsampling_PLIER.R)
+MajorityRules <- function(list.of.plier.models) {
+  
+  # what pathways have at least one LV with FDR < 0.05
+  IdentifyCapturedPathways <- function(plier.results) {
+    summary.df <- plier.results$summary
+    captured.pathways <- 
+      # TODO: add fdr.cutoff arg
+      unique(summary.df$pathway[which(summary.df$FDR < 0.05)])
+  }
+  
+  # for each model (repeat) in the list, what pathways are captured? 
+  captured.pathways.list <- 
+    lapply(list.of.plier.models, function(x) IdentifyCapturedPathways(x$PLIER))
+  
+  # get counts
+  count.table <- table(unlist(captured.pathways.list))
+  
+  # in 3 or more models 
+  # TODO: don't hardcode 3
+  majority.pathways <- names(count.table[which(count.table >= 3)])
+  
+  # return the list of pathways represented in the majority of models  
+  return(majority.pathways)
+  
+}
+```
+
+#### Directories
+
+Specifically for this notebook
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "33")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "33")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+We're interested in the models exploring the different biological contexts,
+not the various sample sizes.
+
+```{r}
+models.dir <- "models"
+# can be distinguished by the file names
+model.files <- list.files(models.dir, pattern = "accessions", full.names = TRUE)
+```
+
+## Do the thing!
+
+```{r}
+pathway.lists <- lapply(model.files, function(x) {
+    model.list <- readRDS(x)
+    MajorityRules(model.list)
+  })
+names(pathway.lists) <- stringr::str_match(model.files,
+                                           "recount2_(.*?)_accessions")[, 2]
+```
+
+```{r}
+UpSetR::upset(UpSetR::fromList(pathway.lists), 
+              order.by = "freq",
+              point.size = 2, line.size = 1,
+              mainbar.y.label = "Intersection of Pathways",
+              text.scale = 1.25)
+```
+
+We can use `VennDiagram::calculate.overlap` to find which pathways are 
+overlapping and use the intersection size above to help us figure things out 
+from there.
+
+```{r}
+overlaps.list <- VennDiagram::calculate.overlap(pathway.lists)
+```
+
+### Blood
+
+Let's take a look at what is captured exclusively in the models trained on
+blood. 
+
+```{r}
+data.frame(overlaps.list$a1)
+```
+
+We can see that half of these are immune cell-related genesets. 
+Specifically, the `DMAP` gene sets are further differentiated cell types 
+(see [Figure 1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3049864/figure/F1/)
+of [Novershtern, et al. _Cell._ 2011.](https://dx.doi.org/10.1016%2Fj.cell.2011.01.004))
+
+### Everything but cancer
+
+If we look at the UpSet plot above, we can see that the largest set of
+in-all-but-one is excluding cancer with 22 pathways.
+
+What are the pathways that are left out of the cancer models?
+
+```{r}
+data.frame(overlaps.list$a27)
+```
+
+We can see that natural killer (NK) cells are represented in other models,
+but less so in cancer (e.g., `DMAP_NKA1` and `SVM NK cells activated`).
+
+We'd likely expect models that are trained on blood to be particularly good 
+at capturing NK cell signals despite their relatively small sample size 
+(`n = 3862`).
+
+It could be that the cancer sample size (`n = 8807`) is just too small to
+adequately capture this signal.
+We trained models on 8000 randomly selected samples, so we can use those models
+to look into this.
+
+```{r}
+eight.thousand.file <- file.path(models.dir, 
+                                 "subsampled_recount2_PLIER_model_8000.RDS")
+eight.thousand.list <- readRDS(eight.thousand.file)
+```
+
+What pathways are in the majority of models (`n = 8000`, randomly selected)?
+
+```{r}
+eight.thousand.pathways <- MajorityRules(eight.thousand.list)
+```
+
+Are NK cells covered?
+
+```{r}
+data.frame(eight.thousand.pathways[grep("NK", eight.thousand.pathways)])
+```
+
+This underrepresentation in cancer models may be due to the sometimes 
+immunosuppressive nature of the tumor microenvironment. 
+However, this analysis doesn't specifically examine the _quality or usefulness_ 
+of the NK cell gene set-latent variable association (i.e., is the latent 
+variable associated with many, unrelated pathways?).
