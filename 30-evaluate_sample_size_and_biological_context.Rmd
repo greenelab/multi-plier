@@ -1,0 +1,297 @@
+---
+title: "Evaluating subsampling: sample size 'sweep' and biological contexts"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In `29-train_models_different_sample_size.sh`, we trained models of different 
+sample sizes (5x repeats with different random seeds) and in 
+`28-train_different_biological_contexts.sh`, we trained models using training
+sets comprised of different (predicted by MetaSRA) 
+Here, we're interested in evaluating these models.
+Specifically, we want to know:
+
+* **How many latent variables were learned by each model?** 
+  We expect this number to increase with sample size.
+* **Of the pathway supplied to the model during training, what proportion of 
+  these are captured by the model?**
+  (We refer to this measure as "pathway coverage.")
+  We also expect this number to go up with sample size, at least initially, and
+  for this metric to be somewhat stable across repeats, based on the results
+  displayed/plotted in `17-plotting_repeat_evals` (calculated in 
+  `15-evaluate_subsampling`).
+  The different biological contexts datasets are of varying sizes as well.
+* **What pathways are captured?**
+  Here, again we're concerned with pathways that were supplied to the model 
+  during training.
+  We'll want to do this evaluation in a separate notebook, but we expect a model
+  trained on something like blood will be quite good at capturing immune cell
+  signatures.
+* **What oncogenic pathways are captured by the model?**
+  The [oncogenic pathways from MSigDB](software.broadinstitute.org/gsea/msigdb/genesets.jsp?collection=C6) 
+  were _not_ supplied to the model during training, so this is a holdout set.
+  I hypothesize that models trained on more samples and models that with 
+  "more relevant" training sets (e.g., cancer) will do a bit better at
+  capturing these heldout pathways.
+
+## Set up
+
+#### Custom functions + libraries
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "plier_util.R"))
+```
+
+```{r}
+# intended for use only in this context -- functionalized because the two
+# sets of models have the same structure (e.g., repeats are performed for 
+# both the sample size evaluation _and_ the biological context evaluation)
+EvalRepeats <- function(model.files, holdout.mat, outer.identifier, 
+                        model.names) {
+  # For a vector of model files that are deemed to be related in some way
+  # (e.g., different sample sizes) AND that contain repeats (output of 
+  # scripts/subsampling_PLIER.R with --num_repeats > 1), perform the 
+  # evaluations contained in EvalWrapperWithHoldout AND tidy the results
+  # for use downstream. Returns a list of data.frames.
+  # 
+  # Args:
+  #  model.files: a vector of full paths to different, related model files
+  #  holdout.mat: matrix of heldout pathways for use with EvalWrapperWithHoldout
+  #               see the documentation of CalculateHoldoutAUC for more info
+  #  outer.identifier: character; what are the different, related models 
+  #                    evaulating? e.g., "sample_size" or "biological_context"
+  #  model.names: what should the names of the list of results be? a character
+  #               vector
+  #              
+  # Returns:
+  #   a list of data.frames that contains the following elements: holdout.df,
+  #   num.lvs.df, and coverage.df
+  
+  # calculate pathway coverage, number of latent variables, and the AUC
+  # for the heldout pathways
+  results.list <- 
+    lapply(model.files, # for each set of models
+           function(x) {
+             plier.models <- readRDS(x)  # read in list of models
+             # for each individual repeat
+             lapply(plier.models, function(y) {
+               EvalWrapperWithHoldout(plier.model = y$PLIER,
+                                      holdout.matrix = holdout.mat)
+             })
+           })
+  
+  # we'll name the elements of the list based on the model.names argument
+  names(results.list) <- model.names
+  
+  ## HELDOUT PATHWAYS ----------------------------------------------------------
+  
+  # extract the heldout results element -- the structure of the results list is
+  # sample size -> repeat -> pathway.coverage, num.lvs, heldout.results
+  # we want all the heldout.results from results.list
+  holdout.results <- lapply(results.list, 
+                            function(x) lapply(x, 
+                                               function(y) y$heldout.results))
+  
+  # now we want the results in the form of a data.frame, where we include 
+  # information about the sample size or biological context as well as the 
+  # random seed used to generate that repeat's results
+  holdout.df <- 
+    dplyr::bind_rows(
+      # for each condition, create a data.frame of all the holdout results and
+      # include the random seed as an identifier
+      lapply(holdout.results, 
+             function(x) dplyr::bind_rows(x, .id = "seed")), 
+      # use the outer.identifer arg as an id when we bind all the data.frames 
+      # together
+      .id = outer.identifier 
+    )
+  
+  ## NUMBER OF LATENT VARIABLES ------------------------------------------------
+  
+  # first extract the num.lvs elements, then melt into a data.frame
+  num.lvs.df <- 
+    reshape2::melt(lapply(results.list,
+                          function(x) lapply(x, 
+                                             function(y) y$num.lvs)),
+                   value.name = "number_of_latent_variables")
+  colnames(num.lvs.df)[2:3] <- c("seed", outer.identifier)
+  
+  ### PATHWAY COVERAGE ---------------------------------------------------------
+  
+  # extract only the pathway.coverage elements
+  pathway.coverage.list <- 
+    lapply(results.list, 
+           function(x) lapply(x, function(y) y$pathway.coverage))
+  # melt into data.frame
+  coverage.df <- reshape2::melt(pathway.coverage.list)
+  # since we've melted from a list, rename the columns 
+  colnames(coverage.df)[2:4] <- c("metric", "seed", outer.identifier)
+  
+  # we're only really interested in 2 out of 3 of the metrics calculated by
+  # GetPathwayCoverage -- filter to only those and recode 
+  coverage.df <- coverage.df %>%
+    dplyr::filter(metric %in% c("pathway", "lv")) %>%
+    dplyr::mutate(metric = 
+                    dplyr::case_when(
+                      (metric == "lv") ~ 
+                        "LV associated with pathways",
+                      (metric =="pathway") ~ "pathway coverage"
+                    ))
+ 
+  ## RETURN --------------------------------------------------------------------
+  
+  # return a list of wrangled data.frames
+  return(list(
+    holdout.df = holdout.df,
+    num.lvs.df = num.lvs.df,
+    coverage.df = coverage.df
+  ))
+   
+}
+```
+
+```{r}
+# this is required to get the oncogenic pathways -- we're going to use this
+# as our holdout set here
+library(PLIER)
+```
+
+#### Directory setup
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "30")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "30")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+#### Models to read in
+
+All models we'll evaluate are in `models/`
+
+```{r}
+models.dir <- "models"
+# we want all the models with 'subsampled' in the file name -- these are the
+# sample size evaluations
+size.model.files <- list.files(models.dir, pattern = "subsampled", 
+                               full.names = TRUE)
+size.model.files
+```
+
+Now for the different biological contexts
+
+```{r}
+# biological context models have 'accessions' in the file names
+context.model.files <- list.files(models.dir, pattern = "accessions",
+                                  full.names = TRUE)
+context.model.files
+```
+
+
+## Evaluations
+
+We're going to use the oncogenic pathways that come with PLIER as our holdout
+set.
+
+```{r}
+# load in holdout set
+data("oncogenicPathways")
+```
+
+### Sample size
+
+```{r}
+# we'll name the elements of the list based on their sample size, which we 
+# can extract from the filenames themselves
+size.model.names <- sub(".RDS", "", sub(".*[_]", "", size.model.files))
+```
+
+Main evaluation with `EvalRepeats`
+
+```{r}
+size.results <- EvalRepeats(model.files = size.model.files,
+                            holdout.mat = oncogenicPathways,
+                            outer.identifier = "sample_size",
+                            model.names = size.model.names)
+```
+
+#### Heldout pathways
+
+```{r}
+# write to file
+size.holdout.file <- file.path(results.dir, 
+                               "subsampled_oncogenic_pathways_AUC.tsv")
+readr::write_tsv(size.results$holdout.df, path = size.holdout.file)
+```
+
+#### Number of latent variables
+
+```{r}
+# write to file
+size.num.lvs.file <- file.path(results.dir, "subsampled_number_of_lvs.tsv")
+readr::write_tsv(size.results$num.lvs.df, path = size.num.lvs.file)
+```
+
+#### Pathway coverage
+
+```{r}
+# write to file!
+size.coverage.file <- file.path(results.dir, "subsampled_pathway_coverage.tsv")
+readr::write_tsv(size.results$coverage.df, path = size.coverage.file)
+```
+
+Remove `size.results` for memory reasons -- we've saved everything to file.
+
+```{r}
+rm(size.results)
+```
+
+### Biological contexts
+
+```{r}
+# extract the biological contexts from the file names 
+context.model.names <- stringr::str_match(context.model.files, 
+                                          "recount2_(.*?)_accessions")[, 2]
+```
+
+Main evaluation with `EvalRepeats`
+
+```{r}
+context.results <- EvalRepeats(model.files = context.model.files,
+                               holdout.mat = oncogenicPathways,
+                               outer.identifier = "biological_context",
+                               model.names = context.model.names)
+```
+
+#### Heldout pathways
+
+```{r}
+# write to file
+context.holdout.file <- 
+  file.path(results.dir, "biological_contexts_oncogenic_pathways_AUC.tsv")
+readr::write_tsv(context.results$holdout.df, path = context.holdout.file)
+```
+
+#### Number of latent variables
+
+```{r}
+# write to file
+context.num.lvs.file <- 
+  file.path(results.dir, "biological_context_number_of_lvs.tsv")
+readr::write_tsv(context.results$num.lvs.df, path = context.num.lvs.file)
+```
+
+#### Pathway coverage
+
+```{r}
+# write to file!
+context.coverage.file <- 
+  file.path(results.dir, "biological_context_pathway_coverage.tsv")
+readr::write_tsv(context.results$coverage.df, path = context.coverage.file)
+```

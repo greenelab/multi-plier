@@ -1,0 +1,51 @@
+value	metric	seed	biological_context
+0.2802547770700637	pathway coverage	2876	blood
+0.5361842105263158	LV associated with pathways	2876	blood
+0.2770700636942675	pathway coverage	7883	blood
+0.569078947368421	LV associated with pathways	7883	blood
+0.25955414012738853	pathway coverage	4089	blood
+0.5394736842105263	LV associated with pathways	4089	blood
+0.28503184713375795	pathway coverage	8828	blood
+0.5427631578947368	LV associated with pathways	8828	blood
+0.2659235668789809	pathway coverage	9401	blood
+0.5394736842105263	LV associated with pathways	9401	blood
+0.21656050955414013	pathway coverage	2876	cancer
+0.3716216216216216	LV associated with pathways	2876	cancer
+0.22770700636942676	pathway coverage	7883	cancer
+0.38513513513513514	LV associated with pathways	7883	cancer
+0.2340764331210191	pathway coverage	4089	cancer
+0.42567567567567566	LV associated with pathways	4089	cancer
+0.24044585987261147	pathway coverage	8828	cancer
+0.39864864864864863	LV associated with pathways	8828	cancer
+0.2054140127388535	pathway coverage	9401	cancer
+0.33783783783783783	LV associated with pathways	9401	cancer
+0.27229299363057324	pathway coverage	2876	cell_line
+0.23821989528795812	LV associated with pathways	2876	cell_line
+0.2898089171974522	pathway coverage	7883	cell_line
+0.2696335078534031	LV associated with pathways	7883	cell_line
+0.27070063694267515	pathway coverage	4089	cell_line
+0.24345549738219896	LV associated with pathways	4089	cell_line
+0.28503184713375795	pathway coverage	8828	cell_line
+0.25654450261780104	LV associated with pathways	8828	cell_line
+0.2818471337579618	pathway coverage	9401	cell_line
+0.2421875	LV associated with pathways	9401	cell_line
+0.41878980891719747	pathway coverage	2876	other_tissues
+0.20919540229885059	LV associated with pathways	2876	other_tissues
+0.38057324840764334	pathway coverage	7883	other_tissues
+0.19195402298850575	LV associated with pathways	7883	other_tissues
+0.3853503184713376	pathway coverage	4089	other_tissues
+0.19885057471264367	LV associated with pathways	4089	other_tissues
+0.410828025477707	pathway coverage	8828	other_tissues
+0.20229885057471264	LV associated with pathways	8828	other_tissues
+0.428343949044586	pathway coverage	9401	other_tissues
+0.24022988505747125	LV associated with pathways	9401	other_tissues
+0.3662420382165605	pathway coverage	2876	tissue
+0.2517361111111111	LV associated with pathways	2876	tissue
+0.3535031847133758	pathway coverage	7883	tissue
+0.2708333333333333	LV associated with pathways	7883	tissue
+0.3375796178343949	pathway coverage	4089	tissue
+0.2708333333333333	LV associated with pathways	4089	tissue
+0.34076433121019106	pathway coverage	8828	tissue
+0.24305555555555555	LV associated with pathways	8828	tissue
+0.3328025477707006	pathway coverage	9401	tissue
+0.25	LV associated with pathways	9401	tissue
