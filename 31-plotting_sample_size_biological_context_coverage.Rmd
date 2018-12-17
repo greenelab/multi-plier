@@ -318,3 +318,63 @@ MultiPanelWrapper(size.plot = prop.plots$size,
                   output.file = file.path(plot.dir, "lv_proportion.pdf"))
 
 ```
+
+### Following up on the proportion of LVs associated with pathways results
+
+If we look at the `prop.plots`
+
+```{r}
+prop.plots$size
+prop.plots$context
+prop.plots$recount2
+```
+
+We can see in the sample size plot that, generally speaking, the larger the 
+sample size, the lower the proportion of latent variables that are associated 
+with at least one pathway.
+
+`PLIER::PLIER` has a parameter, `frac`, that determines the fraction of latent
+variables that meets that criterion. 
+(`frac = 0.7` by default in the version of PLIER we have on this Docker 
+container; we did not specify `frac`.)
+
+This parameter is used to set `L3`, which is the penalty on `U` that controls
+sparsity ([Mao, et al. _bioRxiv_. 2017.](http://dx.doi.org/10.1101/116061)).
+Based on my understanding, this controls the proportion of positive entries in 
+`U` (i.e., the number of gene sets that an LV has some association with), but 
+it _does not_ guarantee that all of these associations will be significant
+([Mao, et al. _bioRxiv_. 2017.](http://dx.doi.org/10.1101/116061)) and 
+the cutoff we happen to be using (`FDR < 0.05`) is not taken into account. 
+
+For reference, this is the sample size information for these different training
+sets:
+
+| Biological condition | Sample size |
+|:-----------------------|:----------------|
+| blood | 3862 |
+| cancer | 8807 |
+| tissue | 12396 |
+| cell line | 14532 |
+| other tissues (not blood) | 32984 | 
+
+Once we take the biological context experiments into account, it gets a bit
+more interesting:
+
+* The `blood` training set has ~4000 samples, but models trained on blood have a 
+much higher proportion of latent variables significantly associated with 
+pathways than the models trained on 4000 randomly selected samples.
+We'd expect that there'd be less "technical noise" and more "biological signal"
+in the `blood` training set.
+It's also likely to be a function of the pathways under consideration. 
+Specifically, we supply immune cell-related gene sets to the models, and
+we expect `blood` samples to be _particularly_ relevant for those gene sets.
+* It looks like the _more latent variables_, the _lower proportion of LVs
+significantly associated with a pathway_ based on the sample size results alone.
+And it's certainly the case that the more LVs -> the more pathways that are
+captured by the model (higher pathway coverage). 
+However, `tissue` models have higher number of LVs and more pathway coverage
+than `cell line` models but they have approximately the same proportion of LVs
+significantly associated with a pathway.
+These values are also perhaps a bit lower than we would expect based on sample 
+size alone (looking at `16000` from sample size plot).
+
