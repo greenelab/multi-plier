@@ -1,0 +1,320 @@
+---
+title: "Plotting: sample size and biological context pathway coverage, number
+of latent variables"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In this notebook, we will be plotting:
+
+* The number of latent variables for models trained on 1) different biological 
+contexts 2) random subsampling (various sample sizes) and the 3) full recount2 
+model (MultiPLIER)
+
+* The pathway coverage and proportion of the latent variables associated with
+pathways from the same three conditions
+
+## Set up
+
+```{r}
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+```
+
+We'll use `ggplot2` for plotting.
+
+```{r}
+library(ggplot2)
+```
+
+#### Custom functions
+
+```{r}
+# custom ggplot2 theme
+custom_theme <- function() {
+  ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, 
+                                                       hjust = 1),
+                   legend.position = "none",
+                   plot.title = ggplot2::element_text(hjust = 0.5),
+                   axis.title.x = ggplot2::element_blank(),
+                   text = ggplot2::element_text(size = 15)) 
+}
+```
+
+```{r}
+# this expects that data.frames will already be cleaned and re-ordered!
+# all data.frames must have the same column for use as the y.variable 
+# (e.g., matching y.variable.name)
+ThreePlotsWrapper <- function(size.df, context.df, recount2.df,
+                              y.variable.name, y.label, y.limits = "c(0, 1)") {
+  # Given results for sample size, biological context, and MultiPLIER make
+  # plots for the three conditions (using custom_theme from above)
+  # 
+  # Args:
+  #   size.df: data.frame with the sample size results, requires a column named
+  #          "sample_size"
+  #   context.df: data.frame with the biological context results, requires a 
+  #             column named "biological_context"
+  #   recount2.df: data.frame with multiplier results, requires a column named
+  #              "condition"
+  #   y.variable.name: the column name, shared by all three data.frames, that
+  #                    will be used as the y variable in the plots
+  #   y.label: what should the y-axis label be?
+  #   y.limits: passed to ggplot2::ylim, should follow the format 
+  #             "c(<LOWER LIMIT>, <UPPER LIMIT>)"
+  #
+  # Returns: 
+  #   a list of the follow plots: size, context, recount2
+  
+  # standardized geom_boxplot + geom_jitter plot for sample size and biological
+  # context plots
+  BoxplotJitter <- function(df, x.var, y.var, y.lim){
+    ggplot(data = df, aes_string(x = x.var, 
+                                 y = y.var,
+                                 group = x.var)) +
+      # will be using jitter so including an outlier shape in the boxplot could
+      # confuse things a bit
+      geom_boxplot(outlier.shape = NA) +
+      geom_jitter(alpha = 0.5, width = 0.3) +
+      custom_theme() +
+      ylim(eval(parse(text = y.lim)))
+  }
+  
+  size.plot <- size.df %>%
+    BoxplotJitter(x.var = "sample_size",
+                  y.var = y.variable.name,
+                  y.lim = y.limits) +
+    # only the sample size plot which will be on the left in multipanel figures
+    # will have a y-axis label
+    labs(y = y.label, title = "Sample Size")
+  
+  context.plot <- context.df %>%
+    BoxplotJitter(x.var = "biological_context",
+                  y.var = y.variable.name,
+                  y.lim = y.limits) +
+      labs(y = NULL, title = "Biological Context")
+  
+  # the multiplier plot is a single point. the custom theme is shared.
+  recount2.plot <- recount2.df %>%
+    ggplot(aes_string(x = "condition", y = y.variable.name)) +
+    geom_point(fill = "#0000FF", shape = 23, size = 4) +
+    custom_theme() +
+    ylim(eval(parse(text = y.limits))) +
+    labs(y = NULL, title = "MultiPLIER")
+  
+  # return a list of the three plots
+  return(list("size" = size.plot,
+              "context" = context.plot,
+              "recount2" = recount2.plot))
+}
+
+```
+
+```{r}
+MultiPanelWrapper <- function(size.plot, context.plot, recount2.plot, 
+                              plot.title, output.file) {
+  # given the plots for the sample size experiment, the biological context
+  # experiment and the full MultiPLIER model, respectively, make a multipanel
+  # plot titled with the plot.title argument and saved as an 11"W x 5"H plot
+  # in the location specified by output.file
+  
+  # for the three conditions, make a 3 column multipanel plot
+  panels <- cowplot::plot_grid(size.plot, context.plot, recount2.plot, 
+                               align = "h", 
+                               # the size plot will have the y-axis label
+                               # and the MultiPLIER panel should be quite s
+                               # small
+                               rel_widths = c(1.125, 1, 0.375), 
+                               ncol = 3)
+  
+  # the title "panel"
+  p.title <- cowplot::ggdraw() + 
+    cowplot::draw_label(plot.title, fontface = "bold", 
+                        size = 20)
+  
+  # combine to get the final plot
+  final.plot <- cowplot::plot_grid(p.title, panels, ncol = 1, 
+                                   rel_heights = c(0.1, 1))
+  
+  # save 11"W x 5"H file (the type of file is determined by the file extension
+  # provided in output.file)
+  ggsave(output.file, plot = final.plot, width = 11, height = 5)
+  
+}
+```
+
+#### Directory setup
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "31")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "31")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+For both the biological context and sample size evaluations, the results we
+will be plotting are from `30-evaluate_sample_size_and_biological_context`.
+
+### Biological context
+
+```{r}
+# pathway coverage and proportion of LVs associated with pathways
+context.coverage.file <- file.path("results", "30", 
+                                   "biological_context_pathway_coverage.tsv")
+context.coverage.df <- readr::read_tsv(context.coverage.file) %>%
+  # clean up the context information for plotting
+  dplyr::mutate(biological_context = gsub("_", " ", biological_context)) %>%
+  # reorder by the sample size (low -> high)
+  dplyr::mutate(biological_context = factor(biological_context,
+                                            levels = c("blood", "cancer",
+                                                       "tissue", "cell line",
+                                                       "other tissues")))
+# number of latent variables
+context.num.file <- file.path("results", "30", 
+                              "biological_context_number_of_lvs.tsv")
+context.num.df <- readr::read_tsv(context.num.file) %>%
+  # clean up the context information for plotting
+  dplyr::mutate(biological_context = gsub("_", " ", biological_context)) %>%
+  # reorder by the sample size (low -> high)
+  dplyr::mutate(biological_context = factor(biological_context,
+                                            levels = c("blood", "cancer",
+                                                       "tissue", "cell line",
+                                                       "other tissues")))
+```
+
+### Sample size 
+
+```{r}
+# pathway coverage and proportion of LVs associated with pathways
+size.coverage.file <- file.path("results", "30", 
+                                "subsampled_pathway_coverage.tsv")
+# for plotting, we want the sample size as a factor (otherwise it's hard to
+# see what is happening on the lower end of things) but to order by the integer
+# value
+size.coverage.df <- readr::read_tsv(size.coverage.file) %>%
+    dplyr::mutate(sample_size = factor(sample_size,
+                                     levels = c("500", "1000", "2000", "4000",
+                                                "8000", "16000", "32000")))
+
+# Number of latent variables
+size.num.file <- file.path("results", "30",
+                           "subsampled_number_of_lvs.tsv")
+size.num.df <- readr::read_tsv(size.num.file) %>%
+      dplyr::mutate(sample_size = factor(sample_size,
+                                     levels = c("500", "1000", "2000", "4000",
+                                                "8000", "16000", "32000")))
+```
+
+### MultiPLIER
+
+For the full recount2 bits, we'll use the same values that are in 
+`figure_notebooks/subsampling_figures`.
+(The full model was trained on ~37K samples, because we subset recount2 to
+include only those samples with metadata.)
+
+```{r}
+# number of latent variables in the MultiPLIER model
+recount2.num.lvs <- 987
+# pathway coverage
+recount2.coverage <- 0.4187898
+# proportion of the latent variables associated with a pathway
+recount2.lv.prop <- 0.2016211
+```
+
+Make into `data.frames` for plotting purposes. 
+We'll always use "condition" as one of the column names (see 
+`ThreePlotsWrapper` above).
+
+```{r}
+# proportion of LVs associated with pathways
+recount2.prop.df <- data.frame(value = recount2.lv.prop,
+                               condition = "full recount2")
+# pathway coverage
+recount2.coverage.df <- data.frame(value = recount2.coverage,
+                                   condition = "full recount2")
+# number of latent variables
+recount2.num.df <- 
+  data.frame(number_of_latent_variables = as.integer(recount2.num.lvs),
+             condition = "full recount2")
+```
+
+## Plotting
+
+### Number of latent variables
+
+```{r}
+num.plots <- ThreePlotsWrapper(size.df = size.num.df,
+                               context.df = context.num.df,
+                               recount2.df = recount2.num.df,
+                               y.variable.name = "number_of_latent_variables",
+                               y.label = "number of latent variables",
+                               y.limits = "c(0, 1000)")
+```
+
+Save to file
+
+```{r}
+MultiPanelWrapper(size.plot = num.plots$size,
+                  context.plot = num.plots$context,
+                  recount2.plot = num.plots$recount2,
+                  plot.title = "Number of Latent Variables",
+                  output.file = file.path(plot.dir, 
+                                          "number_of_latent_variables.pdf"))
+```
+
+### Pathway coverage
+
+The sample size and biological context `data.frames` contain the information
+about pathway coverage _and_ the proportion of LVs associated with a pathway,
+so we'll need to filter them to the correct metric.
+
+```{r}
+coverage.plots <- 
+  ThreePlotsWrapper(size.df = dplyr::filter(size.coverage.df,
+                                            metric == "pathway coverage"),
+                    context.df = dplyr::filter(context.coverage.df,
+                                               metric == "pathway coverage"),
+                    recount2.df = recount2.coverage.df,
+                    y.variable.name = "value",
+                    y.label = "proportion of input pathways")
+```
+
+```{r}
+MultiPanelWrapper(size.plot = coverage.plots$size,
+                  context.plot = coverage.plots$context,
+                  recount2.plot = coverage.plots$recount2,
+                  plot.title = "Pathway Coverage",
+                  output.file = file.path(plot.dir, "pathway_coverage.pdf"))
+```
+
+### Latent variables significantly associated with pathways
+
+```{r}
+# for line length/style purposes
+metric.to.use <- "LV associated with pathways"
+prop.plots <- 
+  ThreePlotsWrapper(size.df = dplyr::filter(size.coverage.df,
+                                            metric == metric.to.use),
+                    context.df = dplyr::filter(context.coverage.df,
+                                               metric == metric.to.use),
+                    recount2.df = recount2.coverage.df,
+                    y.variable.name = "value",
+                    y.label = "proportion of latent variables")
+```
+
+```{r}
+MultiPanelWrapper(size.plot = prop.plots$size,
+                  context.plot = prop.plots$context,
+                  recount2.plot = prop.plots$recount2,
+                  plot.title = "LVs significantly associated with pathways",
+                  output.file = file.path(plot.dir, "lv_proportion.pdf"))
+
+```
