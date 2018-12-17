@@ -64,7 +64,7 @@ EvalRepeats <- function(model.files, holdout.mat, outer.identifier,
   #  holdout.mat: matrix of heldout pathways for use with EvalWrapperWithHoldout
   #               see the documentation of CalculateHoldoutAUC for more info
   #  outer.identifier: character; what are the different, related models 
-  #                    evaulating? e.g., "sample_size" or "biological_context"
+  #                    evaluating? e.g., "sample_size" or "biological_context"
   #  model.names: what should the names of the list of results be? a character
   #               vector
   #              
