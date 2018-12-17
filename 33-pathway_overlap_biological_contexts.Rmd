@@ -25,16 +25,24 @@ that pathway is to be considered captured in that biological context.
 ```
 
 ```{r}
-# for a list of plier models (e.g., series of repeats; output of
-# scripts/subsampling_PLIER.R)
-MajorityRules <- function(list.of.plier.models) {
+GetRepresentedPathways <- function(list.of.plier.models, fdr.cutoff = 0.05) {
+  # For a list of plier models (e.g., series of repeats; output of
+  # scripts/subsampling_PLIER.R), find what pathways are represented in a 
+  # majority of those models. 
+  #
+  # Args:
+  #   list.of.plier.models: the list of results
+  #   fdr.cutoff: what FDR threshold should be used to determine if a pathway
+  #               is captured? default is 0.05
+  # 
+  # Returns:
+  #   a vector of pathway names
   
-  # what pathways have at least one LV with FDR < 0.05
+  # what pathways have at least one LV with FDR < fdr.cutoff
   IdentifyCapturedPathways <- function(plier.results) {
     summary.df <- plier.results$summary
     captured.pathways <- 
-      # TODO: add fdr.cutoff arg
-      unique(summary.df$pathway[which(summary.df$FDR < 0.05)])
+      unique(summary.df$pathway[which(summary.df$FDR < fdr.cutoff)])
   }
   
   # for each model (repeat) in the list, what pathways are captured? 
@@ -43,10 +51,11 @@ MajorityRules <- function(list.of.plier.models) {
   
   # get counts
   count.table <- table(unlist(captured.pathways.list))
-  
-  # in 3 or more models 
-  # TODO: don't hardcode 3
-  majority.pathways <- names(count.table[which(count.table >= 3)])
+
+  # which pathways are represented in the majority of models?
+  number.of.models <- length(list.of.plier.models)
+  majority.number <- ceiling(number.of.models / 2)
+  majority.pathways <- names(count.table[which(count.table >= majority.number)])
   
   # return the list of pathways represented in the majority of models  
   return(majority.pathways)
@@ -75,16 +84,19 @@ models.dir <- "models"
 model.files <- list.files(models.dir, pattern = "accessions", full.names = TRUE)
 ```
 
-## Do the thing!
+## Identify the represented pathways
 
 ```{r}
 pathway.lists <- lapply(model.files, function(x) {
     model.list <- readRDS(x)
-    MajorityRules(model.list)
+    GetRepresentedPathways(model.list)
   })
 names(pathway.lists) <- stringr::str_match(model.files,
                                            "recount2_(.*?)_accessions")[, 2]
 ```
+
+Let's make an [UpSet plot](https://caleydo.org/tools/upset/) examining the 
+overlap between the five biological conditions.
 
 ```{r}
 UpSetR::upset(UpSetR::fromList(pathway.lists), 
@@ -92,6 +104,18 @@ UpSetR::upset(UpSetR::fromList(pathway.lists),
               point.size = 2, line.size = 1,
               mainbar.y.label = "Intersection of Pathways",
               text.scale = 1.25)
+```
+
+Save the plot to file
+
+```{r}
+pdf(file.path(plot.dir, "biological_context_upset.pdf"))
+UpSetR::upset(UpSetR::fromList(pathway.lists), 
+              order.by = "freq",
+              point.size = 2, line.size = 1,
+              mainbar.y.label = "Intersection of Pathways",
+              text.scale = 1.25)
+dev.off()
 ```
 
 We can use `VennDiagram::calculate.overlap` to find which pathways are 
@@ -148,7 +172,7 @@ eight.thousand.list <- readRDS(eight.thousand.file)
 What pathways are in the majority of models (`n = 8000`, randomly selected)?
 
 ```{r}
-eight.thousand.pathways <- MajorityRules(eight.thousand.list)
+eight.thousand.pathways <- GetRepresentedPathways(eight.thousand.list)
 ```
 
 Are NK cells covered?
