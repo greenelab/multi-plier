@@ -15,7 +15,9 @@ We're using data from the following publication
 ([`GSE37382`](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE37382) 
 on GEO):
 
-> Northcott PA, Shih DJ, Peacock J, et al. [Subgroup-specific structural variation across 1,000 medulloblastoma genomes.](https://dx.doi.org/10.1038/nature11327) _Nature._ 
+> Northcott PA, Shih DJ, Peacock J, et al. [Subgroup-specific structural 
+variation across 1,000 medulloblastoma 
+genomes.](https://dx.doi.org/10.1038/nature11327) _Nature._ 
 2012;488(7409):49-56. 
 
 It has been processed with `SCAN::SCANfast` through 
@@ -38,7 +40,7 @@ library(org.Hs.eg.db)
 `%>%` <- dplyr::`%>%`
 # need PrepExpressionDF
 source(file.path("util", "test_LV_differences.R"))
-# GetNewDataB
+# need GetNewDataB
 source(file.path("util", "plier_util.R"))
 ```
 
