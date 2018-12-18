@@ -169,14 +169,16 @@ will be plotting are from `30-evaluate_sample_size_and_biological_context`.
 # pathway coverage and proportion of LVs associated with pathways
 context.coverage.file <- file.path("results", "30", 
                                    "biological_context_pathway_coverage.tsv")
+
+# we'll want to reorder the biological contexts by sample size
+context.levels <- c("blood", "cancer", "tissue", "cell line", "other tissues")
+
 context.coverage.df <- readr::read_tsv(context.coverage.file) %>%
   # clean up the context information for plotting
   dplyr::mutate(biological_context = gsub("_", " ", biological_context)) %>%
   # reorder by the sample size (low -> high)
   dplyr::mutate(biological_context = factor(biological_context,
-                                            levels = c("blood", "cancer",
-                                                       "tissue", "cell line",
-                                                       "other tissues")))
+                                            levels = context.levels))
 # number of latent variables
 context.num.file <- file.path("results", "30", 
                               "biological_context_number_of_lvs.tsv")
@@ -185,9 +187,7 @@ context.num.df <- readr::read_tsv(context.num.file) %>%
   dplyr::mutate(biological_context = gsub("_", " ", biological_context)) %>%
   # reorder by the sample size (low -> high)
   dplyr::mutate(biological_context = factor(biological_context,
-                                            levels = c("blood", "cancer",
-                                                       "tissue", "cell line",
-                                                       "other tissues")))
+                                            levels = context.levels))
 ```
 
 ### Sample size 
@@ -196,21 +196,21 @@ context.num.df <- readr::read_tsv(context.num.file) %>%
 # pathway coverage and proportion of LVs associated with pathways
 size.coverage.file <- file.path("results", "30", 
                                 "subsampled_pathway_coverage.tsv")
+
+# order by sample size
+size.levels <- c("500", "1000", "2000", "4000", "8000", "16000", "32000")
+
 # for plotting, we want the sample size as a factor (otherwise it's hard to
 # see what is happening on the lower end of things) but to order by the integer
 # value
 size.coverage.df <- readr::read_tsv(size.coverage.file) %>%
-    dplyr::mutate(sample_size = factor(sample_size,
-                                     levels = c("500", "1000", "2000", "4000",
-                                                "8000", "16000", "32000")))
+    dplyr::mutate(sample_size = factor(sample_size, levels = size.levels))
 
 # Number of latent variables
 size.num.file <- file.path("results", "30",
                            "subsampled_number_of_lvs.tsv")
 size.num.df <- readr::read_tsv(size.num.file) %>%
-      dplyr::mutate(sample_size = factor(sample_size,
-                                     levels = c("500", "1000", "2000", "4000",
-                                                "8000", "16000", "32000")))
+      dplyr::mutate(sample_size = factor(sample_size, levels = size.levels))
 ```
 
 ### MultiPLIER
