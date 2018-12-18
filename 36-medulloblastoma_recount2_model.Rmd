@@ -50,9 +50,9 @@ source(file.path("util", "plier_util.R"))
 # directory that holds all the gene expression matrices
 exprs.dir <- file.path("data", "expression_data")
 # directories specific to this notebook
-plot.dir <- file.path("plots", "37")
+plot.dir <- file.path("plots", "36")
 dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
-results.dir <- file.path("results", "37")
+results.dir <- file.path("results", "36")
 dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
