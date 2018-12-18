@@ -65,7 +65,7 @@ GetRepresentedPathways <- function(list.of.plier.models, fdr.cutoff = 0.05) {
 
 #### Directories
 
-Specifically for this notebook
+Plot and results directories specifically for this notebook.
 
 ```{r}
 # plot and result directory setup for this notebook
