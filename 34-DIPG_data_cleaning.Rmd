@@ -21,15 +21,23 @@ repository:
 
 **Citations:**
 
-> Paugh BS, Broniscer A, Qu C, et al. [Genome-wide analyses identify recurrent amplifications of receptor tyrosine kinases and cell-cycle regulatory genes in diffuse intrinsic pontine glioma.](https://dx.doi.org/10.1200/JCO.2011.35.5677) _J Clin Oncol._ 2011;29(30):3999-4006.
+> Paugh BS, Broniscer A, Qu C, et al. [Genome-wide analyses identify recurrent 
+amplifications of receptor tyrosine kinases and cell-cycle regulatory genes in 
+diffuse intrinsic pontine glioma.](https://dx.doi.org/10.1200/JCO.2011.35.5677) 
+_J Clin Oncol._ 2011;29(30):3999-4006.
 
-> Buczkowicz P, Hoeman C, Rakopoulos P, et al. [Genomic analysis of diffuse intrinsic pontine gliomas identifies three molecular subgroups and recurrent activating _ACVR1_ mutations.](https://dx.doi.org/10.1038/ng.2936) _Nat Genet._ 2014;46(5):451-6. 
+> Buczkowicz P, Hoeman C, Rakopoulos P, et al. [Genomic analysis of diffuse 
+intrinsic pontine gliomas identifies three molecular subgroups and recurrent 
+activating _ACVR1_ mutations.](https://dx.doi.org/10.1038/ng.2936) _Nat Genet._ 
+2014;46(5):451-6. 
 
 ## Set up
 
 ```{r}
 # magrittr pipe
 `%>%` <- dplyr::`%>%`
+# we need the function that aggregates duplicate gene identifiers to the
+# mean value
 source(file.path("util", "test_LV_differences.R"))
 ```
 
@@ -50,17 +58,15 @@ We have the series matrix for `GSE50021`, which contains both the expression
 values and the metadata
 
 ```{r}
-series.mat.file <- file.path(exprs.dir,
-                             "GSE50021_series_matrix.txt")
+series.mat.file <- file.path(exprs.dir, "GSE50021_series_matrix.txt")
 
-# expression matrix
+# expression matrix -- everything but the comment lines that begin with !
 ma.data <- 
   readr::read_delim(series.mat.file, 
                     delim = "\t", 
                     comment = "!",
                     col_names = TRUE, 
                     skip = 1)
-
 ```
 
 #### Gene identifier conversion
@@ -74,8 +80,13 @@ gpl.info.df <- readr::read_tsv(file.path(exprs.dir, "GPL13938-11302.txt"),
 
 ```{r}
 annot.gse50021.df <- gpl.info.df %>%
+  # from the GEO information, grab just the probe identifier and the gene
+  # symbol columns
   dplyr::select(c(ID, Symbol)) %>%
+  # only ILMN IDs (probes) in both
   dplyr::inner_join(ma.data, by = c("ID"  = "ID_REF")) %>%
+  # collapsing duplicate symbols later will require the symbols to be in the
+  # first column, called "Gene", with no additional columns
   dplyr::mutate(Gene = Symbol) %>%
   dplyr::select(-ID, -Symbol) %>%
   dplyr::select(Gene, dplyr::everything())
@@ -84,6 +95,7 @@ annot.gse50021.df <- gpl.info.df %>%
 Collapse duplicate symbols and write to file.
 
 ```{r}
+# summarize to mean
 annot.mean.df <- PrepExpressionDF(annot.gse50021.df)
 readr::write_tsv(annot.mean.df, file.path(exprs.dir, "GSE50021_mean_agg.pcl"))
 ```
@@ -91,6 +103,9 @@ readr::write_tsv(annot.mean.df, file.path(exprs.dir, "GSE50021_mean_agg.pcl"))
 #### Sample metadata
 
 As mentioned above, metadata is also extracted from the series matrix file.
+We do this for a single line at a time that we've picked based on the relevance
+to any downstream analysis we might do (contact information, for example, 
+does not help us in this context).
 
 ```{r}
 # get more information from the series matrix file
@@ -140,6 +155,7 @@ smpl.info.df <- as.data.frame(t(dplyr::bind_rows(sample.accession,
 colnames(smpl.info.df) <- c("sample_accession", "source_name", "tissue",
                             "gender", "age_at_diagnosis_yrs", 
                             "overall_survival_yrs")
+
 # strip extraneous strings
 smpl.info.df <- smpl.info.df %>%
   dplyr::mutate(tissue = gsub("cell type: ", "", tissue),
@@ -148,6 +164,7 @@ smpl.info.df <- smpl.info.df %>%
                                             age_at_diagnosis_yrs),
                 overall_survival_yrs = gsub("os \\(years\\): ", "", 
                                             overall_survival_yrs))
+
 # change "N/A" to NA
 smpl.info.df[which(smpl.info.df == "N/A", arr.ind = TRUE)] <- NA
 ```
@@ -167,6 +184,9 @@ rm(list = setdiff(ls(), to.keep))
 ```
 
 ### E-GEOD-26576
+
+We used an Entrez ID BrainArray package to process this data set and we need 
+gene symbols to work with PLIER.
 
 ```{r}
 # SCANfast processed PCL
@@ -224,8 +244,8 @@ meta.gse26576.file <- file.path(sample.info.dir, "E-GEOD-26576.sdrf.txt")
 meta.gse26576.df <- readr::read_tsv(meta.gse26576.file)
 ```
 
-The sample-data relationship files (specifically, their column names) are 
-pretty tidyverse-unfriendly.
+The sample-data relationship files from ArrayExpress (specifically, their 
+column names) are pretty tidyverse-unfriendly.
 
 ```{r}
 cleaned.meta.df <- data.frame(
