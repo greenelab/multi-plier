@@ -378,3 +378,84 @@ significantly associated with a pathway.
 These values are also perhaps a bit lower than we would expect based on sample 
 size alone (looking at `16000` from sample size plot).
 
+## Check `U` sparsity
+
+To follow up on the observations above, let's check that, _in practice_, the 
+fraction of the LVs that have at least one association with a pathway should be
+**~0.7**.
+First, removing everything from the workspace.
+
+```{r}
+rm(list = ls())
+```
+
+#### Custom functions just for this
+
+```{r}
+# this is intended to be used with lists of models output from
+# scripts/subsampling_PLIER.R
+GetSparsityList <- function(list.of.models) {
+  # we assume that the list of models has names
+  
+  # these sparsity calculations are different from what we've done before
+  CheckUSparsity <- function(plier.model) {
+    u.matrix <- plier.model$U
+    # what proportion of values are positive?
+    total.positive <- sum(u.matrix > 0) / (dim(u.matrix)[1] * dim(u.matrix)[2])
+    # what proportion of columns have at least 1 positive value (association)?
+    col.wise <- sum(apply(u.matrix, 2, function(x) any(x > 0))) / ncol(u.matrix)
+    return(list("overall" = total.positive,
+                "column_wise" = col.wise))
+  }
+  
+  sparsity.list <- lapply(list.of.models, 
+                          function(x) CheckUSparsity(x$PLIER))
+  
+}
+
+# we'll use this twice -- once for biological context and once for sample size
+# we assume that the files.vector is named
+GetResults <- function(files.vector) {
+  lapply(files.vector, 
+         function(x) {
+           # for each file, read in the list of models
+           model.list <- readRDS(x)
+           # get the sparsity list for the current list of models
+           GetSparsityList(model.list)
+         })
+}
+
+```
+
+#### Files
+
+```{r}
+models.dir <- "models"
+# sample size
+size.model.files <- list.files(models.dir, pattern = "subsampled", 
+                               full.names = TRUE)
+names(size.model.files) <- sub(".RDS", "", sub(".*[_]", "", size.model.files))
+
+# biological context
+context.model.files <- list.files(models.dir, pattern = "accessions",
+                                  full.names = TRUE)
+names(context.model.files) <- 
+  stringr::str_match(context.model.files, "recount2_(.*?)_accessions")[, 2]
+
+```
+
+#### Check sparsity
+
+```{r}
+size.results <- GetResults(size.model.files)
+size.df <- reshape2::melt(size.results)
+summary(dplyr::filter(size.df, L3 == "column_wise")$value)
+```
+
+```{r}
+context.results <- GetResults(context.model.files)
+context.df <- reshape2::melt(context.results)
+summary(dplyr::filter(context.df, L3 == "column_wise")$value)
+```
+
+These results are consistent with our expectations.
