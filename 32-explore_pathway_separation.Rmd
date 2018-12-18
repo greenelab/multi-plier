@@ -178,9 +178,9 @@ ifn.gamma.set <- c("REACTOME_INTERFERON_GAMMA_SIGNALING")
 ```{r}
 neutrophil.set <- c("DMAP_GRAN3", "IRIS_Neutrophil-Resting", "SVM Neutrophils")
 monocyte.set <- c("IRIS_Monocyte-Day0", "IRIS_Monocyte-Day1", 
-                   "IRIS_Monocyte-Day7", "DMAP_MONO2", "SVM Monocytes",
-                   "SVM Macrophages M0", "SVM Macrophages M1", 
-                   "SVM Macrophages M2")
+                  "IRIS_Monocyte-Day7", "DMAP_MONO2", "SVM Monocytes",
+                  "SVM Macrophages M0", "SVM Macrophages M1", 
+                  "SVM Macrophages M2")
 ```
 
 #### Proliferation
@@ -199,9 +199,9 @@ g1.set <- c("REACTOME_G1_S_TRANSITION", "REACTOME_M_G1_TRANSITION",
 g2.set <- c("REACTOME_MITOTIC_G2_G2_M_PHASES", "REACTOME_G2_M_CHECKPOINTS")
 ```
 
-#### Wrapper function
+#### Wrapper functions
 
-This is a wrapper function that is not intended to be used outside of the
+These are wrapper functions that are not intended to be used outside of the
 context of this notebook, i.e., we expect `ifn.alpha.set`, etc. to be
 in the global environment and we've essentially hard-coded this to use 
 `FDR < 0.05`.
@@ -226,6 +226,71 @@ AllPairs <- function(plier.model) {
 }
 ```
 
+```{r}
+# this is specifically designed for RDS files that are the output from
+# scripts/subsampling_PLIER.R (e.g., have repeats, elements named PLIER) 
+GetAllPairsDataFrame <- function(model.files, id.name) {
+  # Given a named vector of filenames, get a data.frame of AllPairs results
+  # 
+  # Args:
+  #   model.files: named vector of filenames
+  #   id.name: what should the colname of the identifier be (e.g., 
+  #            "sample_size")
+  # 
+  # Returns:
+  #   A data.frame of AllPairs results
+  
+  # no names? get outta here
+  if(is.null(names(model.files))) {
+    stop("model.files must be a named vector!")
+  }
+  
+  # for each file, read in the RDS (output of scripts/subsampling_PLIER.R) and
+  # run AllPairs
+  results.list <- lapply(model.files,  
+                         function(x) {
+                           # read in the list of 5 models
+                           models.list <- readRDS(x)
+                           lapply(models.list, 
+                                  function(y) {
+                                    # we need to specifically extract the 
+                                    # `PLIER` element of the list and test all 
+                                    # pairof pathways
+                                    AllPairs(plier.model = y$PLIER)
+                                  })
+                         })
+  
+  # melt and bind the AllPairs pathway separation results, using the identifier 
+  # supplied as id.name
+  results.df <- dplyr::bind_rows(lapply(results.list, reshape2::melt), 
+                                 .id = id.name)
+  colnames(results.df)[3:4] <- c("pathway", "seed")
+  
+  # return the results data.frame
+  return(results.df)
+  
+}
+```
+
+```{r}
+# given the output of AllPairsDataFrame, get it suitable shape for heatmaps
+WrangleForHeatmap <- function(results.df, group.colname, group.order) {
+  wrangled.df <- results.df %>%
+    # for each group, pathway pair
+    dplyr::group_by(!!rlang::sym(group.colname), pathway) %>%
+    # count how many models where there's separation
+    dplyr::summarize(model_count = sum(value)) %>%
+    # spread the columns
+    tidyr::spread(!!rlang::sym(group.colname), model_count) %>%
+    # reorder using the vector of "levels" from group.order
+    dplyr::select(c("pathway", group.order)) %>%
+    # the pathway names should be rownames rather than an 
+    # individual column
+    tibble::column_to_rownames("pathway") %>%
+    as.data.frame()
+}
+```
+
 ## Sample size
 
 Evaluations for the effect of sample size of pathway separation, with the
@@ -235,31 +300,12 @@ We performed 5 repeats with different random seeds
 `scripts/subsampling_PLIER.R`).
 
 ```{r}
-# detect for pathway separation
-size.results <- lapply(size.model.files,  # for each sample size (5x repeat)
-                       function(x) {
-                         # read in the list of 5 models
-                         models.list <- readRDS(x)
-                         lapply(models.list, 
-                                function(y) {
-                                  # we need to specifically extract the `PLIER`
-                                  # element of the list and test all pairs
-                                  # of pathways
-                                  AllPairs(plier.model = y$PLIER)
-                                })
-                       })
-# we can derive the names of `size.results` from the names of the model files
+# we can derive useful names from the names of the model files
 # themselves
-names(size.results) <- sub(".RDS", "", sub(".*[_]", "", size.model.files))
-```
-
-```{r}
-# melt and bind the pathway separation results, using the sample size as an
-# identifier
-size.results.df <- dplyr::bind_rows(lapply(size.results, 
-                                           reshape2::melt), 
-                                    .id = "sample_size")
-colnames(size.results.df)[3:4] <- c("pathway", "seed")
+names(size.model.files) <- sub(".RDS", "", sub(".*[_]", "", size.model.files))
+# detect pathway separation
+size.results.df <- GetAllPairsDataFrame(size.model.files,
+                                        id.name = "sample_size")
 ```
 
 We're going to represent this as a heatmap, so we'll need to wrangle the
@@ -273,21 +319,13 @@ results into a `data.frame` that looks like this
 Where we're counting how many of the 5 models (repeats) the pairs of pathways
 are separated.
 
-```{r}
-size.df <- size.results.df %>%
-  # for each sample_size, pathway pair
-  dplyr::group_by(sample_size, pathway) %>%
-  # count how many models where there's separation
-  dplyr::summarize(model_count = sum(value)) %>%
-  # spread the columns
-  tidyr::spread(sample_size, model_count) %>%
-  # reorder such that sample size is increasing
-  dplyr::select(c("pathway", "500", "1000", "2000", "4000", "8000", 
-                  "16000", "32000")) %>%
-  # the pathway names should be rownames rather than an individual column
-  tibble::column_to_rownames("pathway") %>%
-  as.data.frame()
+We've written `WrangleForHeatmap` (see above) for this purpose.
 
+```{r}
+size.df <- WrangleForHeatmap(results.df = size.results.df,
+                             group.colname = "sample_size",
+                             group.order = c("500", "1000", "2000", "4000", 
+                                             "8000", "16000", "32000"))
 # let's take a look at the resulting data.frame
 size.df
 ```
@@ -309,51 +347,20 @@ size.heatmap
 ## Biological context
 
 ```{r}
-# detect for pathway separation
-context.results <- lapply(context.model.files,  # for each context (5x repeat)
-                       function(x) {
-                         # read in the list of 5 models
-                         models.list <- readRDS(x)
-                         lapply(models.list, 
-                                function(y) {
-                                  # we need to specifically extract the `PLIER`
-                                  # element of the list and test all pairs
-                                  # of pathways
-                                  AllPairs(plier.model = y$PLIER)
-                                })
-                       })
-
-# we'll name the elements of the list based on their training set, which we 
-# can extract from the filenames themselves
-names(context.results) <- 
+names(context.model.files) <- 
   stringr::str_match(context.model.files, "recount2_(.*?)_accessions")[, 2]
-```
-
-```{r}
-# melt and bind the pathway separation results, using the sample size as an
-# identifier
-context.results.df <- dplyr::bind_rows(lapply(context.results, 
-                                           reshape2::melt), 
-                                    .id = "biological_context")
-colnames(context.results.df)[3:4] <- c("pathway", "seed")
+# detect for pathway separation
+context.results.df <- GetAllPairsDataFrame(context.model.files,
+                                           id.name = "biological_context")
 ```
 
 Wrangle data for heatmap
 
 ```{r}
-context.df <- context.results.df %>%
-  # for each biological context, pathway pair
-  dplyr::group_by(biological_context, pathway) %>%
-  # count how many models where there's separation
-  dplyr::summarize(model_count = sum(value)) %>%
-  # spread the columns
-  tidyr::spread(biological_context, model_count) %>%
-  # reorder such that sample size is increasing
-  dplyr::select(c("pathway", "blood", "cancer", "tissue", "cell_line", 
-                  "other_tissues")) %>%
-  # the pathway names should be rownames rather than an individual column
-  tibble::column_to_rownames("pathway") %>%
-  as.data.frame()
+context.df <- WrangleForHeatmap(results.df = context.results.df,
+                                group.colname = "biological_context",
+                                group.order = c("blood", "cancer", "tissue", 
+                                                "cell_line", "other_tissues"))
 ```
 
 ```{r}
