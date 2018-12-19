@@ -1,0 +1,423 @@
+---
+title: "Pathway 'separation'"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+We've noted that pathways or genesets that are similar to one another, such as 
+cell types of the myeloid lineage (e.g., neutrophils and monocytes/macrophages),
+can tend to get "lumped together" in PLIER models trained on training sets with
+smaller sample sizes or less relevant biological contexts.
+In contrast, the MultiPLIER model (~37K samples) tends to "separate" similar 
+pathways into different latent variables.
+(See `06-sle-wb_cell_type` and `07-sle_cell_type_recount2_model`.)
+
+**Here, we're interested in the notion of "pathway separation" when different 
+datasets are used for training.**
+
+We'll group related pathways/genesets into pathway sets.
+For instance, we'll group monocyte- and macrophage-related gene sets such as
+`SVM Monocytes` and `DMAP_MONO2` into a "monocyte-related pathway set."
+
+We define **pathway separation** as the following:
+
+* For each pathway set, at least one latent variable is significantly
+associated (`FDR < 0.05`) with a pathway in that set.
+We consider capturing _only one pathway set_ to be insufficient for this 
+evaluation.
+In essence, we want to make sure each set of pathways is represented in or 
+captured by the model. 
+* Each pathway set is _uniquely_ and significantly associated with at least one
+latent variable. 
+In the neutrophil vs. monocyte/macrophage example, it's not sufficient to have a
+neutrophil-associated latent variable and a latent variable associated with 
+both neutrophils and monocytes/macrophages; we also want the monocyte/macrophage
+set to be captured in a latent variable that is _not also associated_ with
+the neutrophil set.
+
+## Set up
+
+```{r}
+library(ComplexHeatmap)
+```
+
+### Functions
+
+```{r}
+`%>%` <- dplyr::`%>%`
+```
+
+#### Custom function for detecting pathway separation
+
+```{r}
+CheckPathwaySeparation <- function(plier.model, pathway.set1, pathway.set2,
+                                   fdr.cutoff = 0.05) {
+  # Given PLIER model and two sets of pathways, check if the model is able
+  # to "separate" them -- i.e., does an LV exist that is significantly 
+  # associated with pathways in one set BUT NOT the other set -- and return
+  # a logical
+  #
+  # Args:
+  #  plier.model: the output list from PLIER::PLIER
+  #  pathway.set1: a character vector of one set of related pathways
+  #  pathway.set2: a character vector of the other set of related pathways
+  #  fdr.cutoff: what value should serve as the threshold for the "significant"
+  #              associations? 0.05 by default
+  # 
+  # Returns: 
+  #   A logical constant (TRUE or FALSE) that indicates whether or not the 
+  #   conditions for pathway separation have been met for pathway.set1 and
+  #   pathway.set2 
+  # 
+  
+  # takes a vector of pathway names and the data.frame that only includes
+  # significant associations between pathways and LVs (summary data.frame
+  # from PLIER::PLIER)
+  GetAssociatedLVs <- function(set.of.pathways, filtered.df) {
+    # this collapsing step will not be problematic if there is 
+    search.pattern <- paste(set.of.pathways, collapse = "|")
+    search.index <- grep(search.pattern, filtered.df$pathway)
+    associated.lvs <- unique(filtered.df$`LV index`[search.index])
+  }
+  
+  # magrittr pipe
+  `%>%` <- dplyr::`%>%`
+  
+  # filter the summary data.frame output from PLIER::PLIER to only associations
+  # that meet the fdr.cutoff threshold
+  sig.summary.df <- plier.model$summary %>%
+    dplyr::filter(FDR < fdr.cutoff)
+  
+  # which LVs are associated with set 1?
+  lvs.set1 <- GetAssociatedLVs(set.of.pathways = pathway.set1,
+                               filtered.df = sig.summary.df)
+  
+  # which LVs are associated with set 2? 
+  lvs.set2 <- GetAssociatedLVs(set.of.pathways = pathway.set2,
+                               filtered.df = sig.summary.df)
+  
+  # are both sets of pathways captured?
+  captured <- all(c(length(lvs.set1) > 0, length(lvs.set2) > 0))
+  # if not, this doesn't qualify as separation
+  if (!captured) {
+    return(FALSE)
+  } else {
+    # is there at least one latent variable that is only associated with
+    # that set -- for both sets
+    set1.unique <- length(setdiff(lvs.set1, lvs.set2)) > 0
+    set2.unique <- length(setdiff(lvs.set2, lvs.set1)) > 0
+    # if so, return TRUE
+    return(all(set1.unique, set2.unique)) 
+  }
+}
+```
+
+### Files
+
+#### Directory setup
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "32")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "32")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+All subsampling and biological context models we will be evaluating are in 
+`models/`
+
+```{r}
+models.dir <- "models"
+```
+
+#### Input
+
+Models from the conditions being tested: sample size and biological context
+
+```{r}
+# models with different sample sizes -- "subsampled" is in the RDS object 
+# file names
+size.model.files <- list.files(models.dir, pattern = "subsampled", 
+                               full.names = TRUE)
+size.model.files
+```
+
+```{r}
+# models for different biological contexts -- "accessions" is in the RDS object 
+# file names
+context.model.files <- list.files(models.dir, pattern = "accessions",
+                                  full.names = TRUE)
+context.model.files
+```
+
+Also want the MultiPLIER / full `recount2` model
+
+```{r}
+recount2.model.file <- file.path("data", "recount2_PLIER_data", 
+                                 "recount_PLIER_model.RDS")
+```
+
+## Sets of pathways for pathway separation
+
+#### Type I and type II interferon
+
+Interferon (IFN)
+
+```{r}
+ifn.alpha.set <- c("REACTOME_INTERFERON_ALPHA_BETA_SIGNALING")
+ifn.gamma.set <- c("REACTOME_INTERFERON_GAMMA_SIGNALING")
+```
+
+#### Myeloid lineage
+
+```{r}
+neutrophil.set <- c("DMAP_GRAN3", "IRIS_Neutrophil-Resting", "SVM Neutrophils")
+monocyte.set <- c("IRIS_Monocyte-Day0", "IRIS_Monocyte-Day1", 
+                  "IRIS_Monocyte-Day7", "DMAP_MONO2", "SVM Monocytes",
+                  "SVM Macrophages M0", "SVM Macrophages M1", 
+                  "SVM Macrophages M2")
+```
+
+#### Proliferation
+
+Molecular processes we would associate with proliferating cells, namely the
+G1 and G2 phases of the cell cycle.
+
+```{r}
+g1.set <- c("REACTOME_G1_S_TRANSITION", "REACTOME_M_G1_TRANSITION",
+            "REACTOME_APC_C_CDH1_MEDIATED_DEGRADATION_OF_CDC20_AND_OTHER_APC_C_CDH1_TARGETED_PROTEINS_IN_LATE_MITOSIS_EARLY_G1", 
+            "REACTOME_CYCLIN_E_ASSOCIATED_EVENTS_DURING_G1_S_TRANSITION_", 
+            "REACTOME_G1_PHASE", "REACTOME_MITOTIC_M_M_G1_PHASES",
+            "REACTOME_P53_DEPENDENT_G1_DNA_DAMAGE_RESPONSE", 
+            "REACTOME_MITOTIC_G1_G1_S_PHASES", 
+            "REACTOME_P53_INDEPENDENT_G1_S_DNA_DAMAGE_CHECKPOINT")
+g2.set <- c("REACTOME_MITOTIC_G2_G2_M_PHASES", "REACTOME_G2_M_CHECKPOINTS")
+```
+
+#### Wrapper functions
+
+These are wrapper functions that are not intended to be used outside of the
+context of this notebook, i.e., we expect `ifn.alpha.set`, etc. to be
+in the global environment and we've essentially hard-coded this to use 
+`FDR < 0.05`.
+
+```{r}
+# check pathway separation of all pairs of pathways -- IFN, myeloid,
+# 'proliferation'
+AllPairs <- function(plier.model) {
+  ifn.results <- CheckPathwaySeparation(plier.model = plier.model,
+                                        pathway.set1 = ifn.alpha.set,
+                                        pathway.set2 = ifn.gamma.set)
+  myeloid.results <- CheckPathwaySeparation(plier.model = plier.model,
+                                        pathway.set1 = neutrophil.set,
+                                        pathway.set2 = monocyte.set)
+  proliferation.results <- 
+    CheckPathwaySeparation(plier.model = plier.model,
+                           pathway.set1 = g1.set,
+                           pathway.set2 = g2.set)
+
+  return(list(IFN = ifn.results, MYELOID = myeloid.results,
+              PROLIFERATION = proliferation.results))
+}
+```
+
+```{r}
+# this is specifically designed for RDS files that are the output from
+# scripts/subsampling_PLIER.R (e.g., have repeats, elements named PLIER) 
+GetAllPairsDataFrame <- function(model.files, id.name) {
+  # Given a named vector of filenames, get a data.frame of AllPairs results
+  # 
+  # Args:
+  #   model.files: named vector of filenames
+  #   id.name: what should the colname of the identifier be (e.g., 
+  #            "sample_size")
+  # 
+  # Returns:
+  #   A data.frame of AllPairs results
+  
+  # no names? get outta here
+  if(is.null(names(model.files))) {
+    stop("model.files must be a named vector!")
+  }
+  
+  # for each file, read in the RDS (output of scripts/subsampling_PLIER.R) and
+  # run AllPairs
+  results.list <- lapply(model.files,  
+                         function(x) {
+                           # read in the list of 5 models
+                           models.list <- readRDS(x)
+                           lapply(models.list, 
+                                  function(y) {
+                                    # we need to specifically extract the 
+                                    # `PLIER` element of the list and test all 
+                                    # pairof pathways
+                                    AllPairs(plier.model = y$PLIER)
+                                  })
+                         })
+  
+  # melt and bind the AllPairs pathway separation results, using the identifier 
+  # supplied as id.name
+  results.df <- dplyr::bind_rows(lapply(results.list, reshape2::melt), 
+                                 .id = id.name)
+  colnames(results.df)[3:4] <- c("pathway", "seed")
+  
+  # return the results data.frame
+  return(results.df)
+  
+}
+```
+
+```{r}
+# given the output of AllPairsDataFrame, get it suitable shape for heatmaps
+WrangleForHeatmap <- function(results.df, group.colname, group.order) {
+  wrangled.df <- results.df %>%
+    # for each group, pathway pair
+    dplyr::group_by(!!rlang::sym(group.colname), pathway) %>%
+    # count how many models where there's separation
+    dplyr::summarize(model_count = sum(value)) %>%
+    # spread the columns
+    tidyr::spread(!!rlang::sym(group.colname), model_count) %>%
+    # reorder using the vector of "levels" from group.order
+    dplyr::select(c("pathway", group.order)) %>%
+    # the pathway names should be rownames rather than an 
+    # individual column
+    tibble::column_to_rownames("pathway") %>%
+    as.data.frame()
+}
+```
+
+## Sample size
+
+Evaluations for the effect of sample size of pathway separation, with the
+following sample sizes: `500`, `1000`, `2000`, `4000`, `8000`, `16000`, `32000`
+We performed 5 repeats with different random seeds 
+(see `29-train_models_different_sample_size.sh` and 
+`scripts/subsampling_PLIER.R`).
+
+```{r}
+# we can derive useful names from the names of the model files
+# themselves
+names(size.model.files) <- sub(".RDS", "", sub(".*[_]", "", size.model.files))
+# detect pathway separation
+size.results.df <- GetAllPairsDataFrame(size.model.files,
+                                        id.name = "sample_size")
+```
+
+We're going to represent this as a heatmap, so we'll need to wrangle the
+results into a `data.frame` that looks like this
+
+|   | 500 | ... | 32000 |
+|:-:|:---:|:---:|:-----:|
+|IFN|  0  | ... | 3     |
+|MYELOID|  0  | ... | 5   |
+
+Where we're counting how many of the 5 models (repeats) the pairs of pathways
+are separated.
+
+We've written `WrangleForHeatmap` (see above) for this purpose.
+
+```{r}
+size.df <- WrangleForHeatmap(results.df = size.results.df,
+                             group.colname = "sample_size",
+                             group.order = c("500", "1000", "2000", "4000", 
+                                             "8000", "16000", "32000"))
+# let's take a look at the resulting data.frame
+size.df
+```
+
+```{r}
+size.heatmap <- 
+  ComplexHeatmap::Heatmap(as.matrix(size.df),
+                          cluster_rows = FALSE,
+                          cluster_columns = FALSE,
+                          row_names_side = "left",
+                          column_names_side = "top",
+                          col = colorRampPalette(c("white", "blue3"))(6),
+                          rect_gp = grid::gpar(col = "black"),
+                          show_heatmap_legend = TRUE,
+                          name = "number of models")
+size.heatmap
+```
+
+## Biological context
+
+```{r}
+names(context.model.files) <- 
+  stringr::str_match(context.model.files, "recount2_(.*?)_accessions")[, 2]
+# detect for pathway separation
+context.results.df <- GetAllPairsDataFrame(context.model.files,
+                                           id.name = "biological_context")
+```
+
+Wrangle data for heatmap
+
+```{r}
+context.df <- WrangleForHeatmap(results.df = context.results.df,
+                                group.colname = "biological_context",
+                                group.order = c("blood", "cancer", "tissue", 
+                                                "cell_line", "other_tissues"))
+```
+
+```{r}
+context.heatmap <- 
+  ComplexHeatmap::Heatmap(as.matrix(context.df),
+                          cluster_rows = FALSE,
+                          cluster_columns = FALSE,
+                          row_names_side = "left",
+                          column_names_side = "top",
+                          col = colorRampPalette(c("white", "blue3"))(6),
+                          rect_gp = grid::gpar(col = "black"),
+                          show_heatmap_legend = FALSE,
+                          name = "number of models",
+                          show_row_names = FALSE)
+```
+
+## MultiPLIER
+
+Now repeat this with the full model.
+
+```{r}
+# read in the model
+multiplier.model <- readRDS(recount2.model.file)
+# check all pairs for separation
+multiplier.results <- AllPairs(plier.model = multiplier.model)
+# there's only one model -- so this is a binary outcome!
+multiplier.df <- reshape2::melt(multiplier.results) %>%  # melt the results
+  # the variable name is pathway
+  dplyr::mutate(pathway = L1,
+                MultiPLIER = as.integer(value)) %>%
+  dplyr::select(c("pathway", "MultiPLIER")) %>%
+  tibble::column_to_rownames("pathway") %>%
+  as.data.frame()
+```
+
+Heatmap itself
+
+```{r}
+multiplier.heatmap <- 
+  ComplexHeatmap::Heatmap(as.matrix(multiplier.df),
+                          cluster_rows = FALSE,
+                          cluster_columns = FALSE,
+                          column_names_side = "top",
+                          col = "blue4",
+                          rect_gp = grid::gpar(col = "black"),
+                          name = "pathway separation",
+                          show_heatmap_legend = TRUE,
+                          show_row_names = FALSE)
+```
+
+## Final plotting
+
+```{r}
+heatmap.list <- size.heatmap + context.heatmap + multiplier.heatmap 
+pdf(file.path(plot.dir, "multiplier_separation.pdf"))
+ComplexHeatmap::draw(heatmap.list)
+dev.off()
+```
+
+
