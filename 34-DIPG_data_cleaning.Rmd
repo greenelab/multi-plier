@@ -269,6 +269,6 @@ Write the cleaned metadata to file.
 ```{r}
 readr::write_tsv(cleaned.meta.df, 
                  path = file.path(sample.info.dir, 
-                                  "E-GEOD-26575_cleaned_metadata.tsv"))
+                                  "E-GEOD-26576_cleaned_metadata.tsv"))
 ```
 
