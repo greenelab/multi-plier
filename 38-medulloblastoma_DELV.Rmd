@@ -1,0 +1,97 @@
+---
+title: "Identifying differentially expressed latent variables in 
+medulloblastoma"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+Here, we're testing for latent variable differential expression between
+medulloblastoma subgroups (Group 3, Group 4, and SHH).
+
+As in `36-medulloblastoma_recount2_model`, where we prepped the data we are
+analyzing here, this is using 
+[Northcott, et al.](https://dx.doi.org/10.1038/nature11327) data.
+
+## Set up
+
+```{r}
+# pipe is required for LVTestWrapper
+`%>%` <- dplyr::`%>%`
+```
+
+We have several custom functions that we've written and previously used in our 
+ANCA-associated vasculitis analyses.
+They are general enough that we can use them again here.
+
+```{r}
+source(file.path("util", "test_LV_differences.R"))
+```
+
+#### Directories
+
+```{r}
+# directories specific to this notebook
+plot.dir <- file.path("plots", "38")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "38")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in files
+
+We need two things to do this analysis: a B matrix (latent variable values) and
+a `data.frame` that contains the sample labels for the groups that we'd like
+to test for differences between.
+
+```{r}
+mb.b.file <- file.path("results", "36", "medulloblastoma_recount2_B.RDS")
+mb.sample.file <- file.path("data", "sample_info", 
+                            "GSE37382_cleaned_metadata.tsv")
+```
+
+Read in `B` (MultiPLIER)
+
+```{r}
+b.matrix <- readRDS(mb.b.file)
+```
+
+Read in the `data.frame` with the subgroup information and check that the
+sample names match between these two files.
+
+```{r}
+sample.info.df <- readr::read_tsv(mb.sample.file)
+all(sample.info.df$source_name %in% colnames(b.matrix))
+```
+
+`LVTestWrapper` requires that the sample names/identifiers are in a column named
+`Sample`, so we'll change `source_name` to `Sample`.
+
+```{r}
+colnames(sample.info.df)[1] <- "Sample"
+```
+
+## Test for differential expression
+
+
+`LVTestWrapper` gives us 3 things: 1) differential expression results from
+`limma`, 2) boxplot + jitter plots of the latent variable expression and 3)
+the `B` matrix in "long" format -- this is what is used for plotting.
+
+We'll use `"BH"` correction for multiple hypotheses testing (the default).
+
+```{r}
+LVTestWrapper(b.matrix = b.matrix,
+              sample.info.df = sample.info.df,
+              phenotype.col = "subgroup",
+              # the boxplot output, the "long" format B data.frame (useful for 
+              # plotting), and the limma differential expression results
+              # will be output in files that begin with this string
+              file.lead = "medulloblastoma_subgroup_recount2_model",
+              plot.dir = plot.dir,
+              results.dir = results.dir)
+```
+
