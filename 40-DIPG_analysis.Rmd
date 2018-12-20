@@ -1,0 +1,99 @@
+---
+title: "DIPG: Analysis"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+Analyze the DIPG `B` matrices from the MultiPLIER model
+
+## Set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+source(file.path("util", "test_LV_differences.R"))
+```
+
+Directories for this notebook
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "40")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "40")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in files
+
+#### GSE50021
+
+```{r}
+gse50021.b.file <- file.path("results", "35", "GSE50021_recount2_B.RDS")
+gse50021.b <- readRDS(gse50021.b.file)
+gse50021.meta.file <- file.path("data", "sample_info", 
+                                "GSE50021_cleaned_metadata.tsv")
+gse50021.meta.df <- readr::read_tsv(gse50021.meta.file)
+```
+
+#### GSE26576
+
+```{r}
+gse26576.b.file <- file.path("results", "35", "E-GEOD-26576_recount2_B.RDS")
+gse26576.b <- readRDS(gse26576.b.file)
+gse26576.meta.file <- file.path("data", "sample_info", 
+                                "E-GEOD-26576_cleaned_metadata.tsv")
+gse26576.meta.df <- readr::read_tsv(gse26576.meta.file)
+```
+
+### Metadata
+
+We should explore the metadata a little bit, because these datasets are both
+quite small.
+So, we'll need to sort out what kinds of analyses are possible.
+
+```{r}
+gse50021.meta.df %>%
+  dplyr::group_by(tissue) %>%
+  dplyr::tally()
+```
+
+```{r}
+gse26576.meta.df %>%
+  dplyr::group_by(disease_state) %>%
+  dplyr::tally()
+```
+
+`GSE26576` does not have enough normal samples for a DIPG-normal comparison and
+the other groups in `GSE26576` are not present in `GSE50021`.
+
+We can do a comparison of DIPG-normal in `GSE50021`.
+
+## Differential expression in `GSE50021`
+
+```{r}
+gse50021.results <- 
+  LVTestWrapper(b.matrix = gse50021.b,
+                sample.info.df = dplyr::mutate(gse50021.meta.df,
+                                               Sample = sample_accession),
+                phenotype.col = "tissue",
+                file.lead = "GSE50021_normal_dipg",
+                plot.dir = plot.dir,
+                results.dir = results.dir)
+```
+
+```{r}
+gse50021.results$limma %>%
+  dplyr::filter(adj.P.Val < 0.05)
+```
+
+After revisiting [Buczkowicz, et al.](https://dx.doi.org/10.1038/ng.2936) and
+the [`GSE50021`](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE50021)
+accession, there is no information about which _part_ of the brain the normal
+brain came from or how it was obtained. 
+So, I am a bit concerned about drawing any conclusions from this analysis, as
+the differences we see may not be attributable to disease state.
+
