@@ -263,6 +263,19 @@ cleaned.meta.df <- data.frame(
   dplyr::select(-material_type)
 ```
 
+There is information in the `sample_title` field that can help us fill in
+the `disease_state` blanks.
+
+```{r}
+cleaned.meta.df <- cleaned.meta.df %>%
+  dplyr::mutate(disease_state = dplyr::case_when(
+    grepl("normal", cleaned.meta.df$sample_title) ~ "normal",
+    grepl("low", cleaned.meta.df$sample_title) ~ "LGG",
+    grepl("DIPG", cleaned.meta.df$sample_title) ~ "DIPG",
+    grepl("Glioblastoma", cleaned.meta.df$sample_title) ~ "Glioblastoma"
+  ))
+```
+
 The `sample_file` field will match the headers of the PCL file.
 Write the cleaned metadata to file.
 
