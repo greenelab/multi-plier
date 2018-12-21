@@ -14,7 +14,8 @@ medulloblastoma subgroups (Group 3, Group 4, and SHH).
 
 As in `36-medulloblastoma_recount2_model`, where we prepped the data we are
 analyzing here, this is using 
-[Northcott, et al.](https://dx.doi.org/10.1038/nature11327) data.
+[Northcott, et al.](https://dx.doi.org/10.1038/nature11327)  and
+[Robinson, et al.](https://dx.doi.org/10.1038/nature11213) data.
 
 ## Set up
 
@@ -47,35 +48,93 @@ We need two things to do this analysis: a B matrix (latent variable values) and
 a `data.frame` that contains the sample labels for the groups that we'd like
 to test for differences between.
 
+### GSE37382 (Northcott, et al.)
+
 ```{r}
-mb.b.file <- file.path("results", "36", "medulloblastoma_recount2_B.RDS")
-mb.sample.file <- file.path("data", "sample_info", 
-                            "GSE37382_cleaned_metadata.tsv")
+northcott.b.file <- file.path("results", "36", "GSE37382_recount2_B.RDS")
+northcott.sample.file <- file.path("data", "sample_info", 
+                                   "GSE37382_cleaned_metadata.tsv")
 ```
 
 Read in `B` (MultiPLIER)
 
 ```{r}
-b.matrix <- readRDS(mb.b.file)
+northcott.b.matrix <- readRDS(northcott.b.file)
 ```
 
 Read in the `data.frame` with the subgroup information and check that the
 sample names match between these two files.
 
 ```{r}
-sample.info.df <- readr::read_tsv(mb.sample.file)
-all(sample.info.df$source_name %in% colnames(b.matrix))
+northcott.sample.df <- readr::read_tsv(northcott.sample.file)
+all(northcott.sample.df$source_name %in% colnames(northcott.b.matrix))
 ```
 
 `LVTestWrapper` requires that the sample names/identifiers are in a column named
 `Sample`, so we'll change `source_name` to `Sample`.
 
 ```{r}
-colnames(sample.info.df)[1] <- "Sample"
+colnames(northcott.sample.df)[1] <- "Sample"
+```
+
+### GSE37418 (Robinson, et al.)
+
+We'll repeat that process for the Robinson, et al. data
+
+```{r}
+robinson.b.file <- file.path("results", "36", "GSE37418_recount2_B.RDS")
+robinson.sample.file <- file.path("data", "sample_info", 
+                                  "metadata_GSE37418.tsv")
+```
+
+```{r}
+robinson.b.matrix <- readRDS(robinson.b.file)
+robinson.sample.df <- readr::read_tsv(robinson.sample.file)
+```
+
+The subgroup information in this data set is a bit different, let's look at
+the counts
+
+```{r}
+robinson.sample.df %>% 
+  dplyr::group_by(subgroup) %>%
+  dplyr::tally()
+```
+
+To do differential expression analysis, we'll remove the `SHH OUTLIER` and
+`U` samples
+
+```{r}
+sample.index <- which(robinson.sample.df$subgroup %in% c("U",
+                                                         "SHH OUTLIER"))
+samples.to.remove <- robinson.sample.df$refinebio_accession_code[sample.index]
+samples.to.remove
+```
+
+```{r}
+remove.column.index <- which(colnames(robinson.b.matrix) %in% samples.to.remove)
+```
+
+Do the filtering
+
+```{r}
+robinson.b.matrix <- robinson.b.matrix[, -remove.column.index]
+robinson.sample.df <- robinson.sample.df %>%
+  dplyr::filter(!(refinebio_accession_code %in% samples.to.remove)) %>%
+  dplyr::select(c("refinebio_accession_code", "subgroup", "Sex", "age",
+                  "title"))
+```
+
+```{r}
+all(robinson.sample.df$refinebio_accession_code %in% 
+      colnames(robinson.b.matrix))
+```
+
+```{r}
+colnames(robinson.sample.df)[1] <- "Sample"
 ```
 
 ## Test for differential expression
-
 
 `LVTestWrapper` gives us 3 things: 1) differential expression results from
 `limma`, 2) boxplot + jitter plots of the latent variable expression and 3)
@@ -84,14 +143,43 @@ the `B` matrix in "long" format -- this is what is used for plotting.
 We'll use `"BH"` correction for multiple hypotheses testing (the default).
 
 ```{r}
-LVTestWrapper(b.matrix = b.matrix,
-              sample.info.df = sample.info.df,
-              phenotype.col = "subgroup",
-              # the boxplot output, the "long" format B data.frame (useful for 
-              # plotting), and the limma differential expression results
-              # will be output in files that begin with this string
-              file.lead = "medulloblastoma_subgroup_recount2_model",
-              plot.dir = plot.dir,
-              results.dir = results.dir)
+northcott.results <- 
+  LVTestWrapper(b.matrix = northcott.b.matrix,
+                sample.info.df = northcott.sample.df,
+                phenotype.col = "subgroup",
+                # the boxplot output, the "long" format B data.frame (useful for 
+                # plotting), and the limma differential expression results
+                # will be output in files that begin with this string
+                file.lead = "GSE37382_subgroup_recount2_model",
+                plot.dir = plot.dir,
+                results.dir = results.dir)
+```
+
+```{r}
+robinson.results <- 
+  LVTestWrapper(b.matrix = robinson.b.matrix,
+                sample.info.df = robinson.sample.df,
+                phenotype.col = "subgroup",
+                file.lead = "GSE37418_subgroup_recount2_model",
+                plot.dir = plot.dir,
+                results.dir = results.dir)
+```
+
+### Any overlap at all?
+
+```{r}
+northcott.delvs <- 
+  northcott.results$limma$LV[which(northcott.results$limma$adj.P.Val < 0.05)]
+```
+
+```{r}
+robinson.delvs <- 
+  robinson.results$limma$LV[which(robinson.results$limma$adj.P.Val < 0.05)]
+```
+
+```{r}
+VennDiagram::venn.diagram(list(Robinson = robinson.delvs,
+                               Northcott = northcott.delvs),
+                          file.path(plot.dir, "Medulloblastoma_DELV_Venn.tiff"))
 ```
 
