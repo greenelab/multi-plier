@@ -21,9 +21,9 @@ Directories for this notebook
 
 ```{r}
 # plot and result directory setup for this notebook
-plot.dir <- file.path("plots", "40")
+plot.dir <- file.path("plots", "36")
 dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
-results.dir <- file.path("results", "40")
+results.dir <- file.path("results", "36")
 dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
