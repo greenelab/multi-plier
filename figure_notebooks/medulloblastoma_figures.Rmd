@@ -1,0 +1,121 @@
+---
+title: "Display items: Medulloblastoma"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+We've looked into differential expression of latent variables in the
+[Northcott, et al.](https://dx.doi.org/10.1038/nature11327) 
+and [Robinson, et al.](https://dx.doi.org/10.1038/nature11213) 
+medulloblastoma datasets. 
+Specifically, we looked at differential expression between subgroups of 
+patients.
+
+## Set up
+
+#### Functions and libraries
+
+```{r}
+`%>%` <- dplyr::`%>%`
+library(ggplot2)
+```
+
+#### Directories
+
+```{r setup}
+# set directory to top directory of project
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r}
+plot.dir <- file.path("figure_notebooks", "figures")
+dir.create(plot.dir, showWarnings = FALSE, recursive = TRUE)
+```
+
+## Read in data
+
+```{r}
+northcott.file <- 
+  file.path("results", "38", 
+            "GSE37382_subgroup_recount2_model_B_long_sample_info.tsv")
+northcott.df <- readr::read_tsv(northcott.file)
+```
+
+```{r}
+robinson.file <- 
+  file.path("results", "38",
+            "GSE37418_subgroup_recount2_model_B_long_sample_info.tsv")
+robinson.df <- readr::read_tsv(robinson.file)
+```
+
+## Data wrangling
+
+```{r}
+unique(robinson.df$subgroup)
+```
+
+```{r}
+unique(northcott.df$subgroup)
+```
+
+Recode the `subgroup` labels in Robinson to match Northcott and change some
+column names to be more consistent as well
+
+```{r}
+robinson.df <- robinson.df %>%
+  dplyr::mutate(subgroup = dplyr::case_when(
+    subgroup == "G4" ~ "Group 4",
+    subgroup == "G3" ~ "Group 3",
+    TRUE ~ subgroup
+  ), sex = Sex) %>%
+  dplyr::select(-Sex)
+unique(robinson.df$subgroup)
+```
+
+We'll join these two `data.frame` together to facilitate plotting, filtering 
+for latent variables of interest after the fact.
+
+```{r}
+selected.columns <- c("LV", "Sample", "Value", "subgroup")
+lv.df <- dplyr::bind_rows(
+  dplyr::select(northcott.df, !!rlang::enquo(selected.columns)),
+  dplyr::select(robinson.df, !!rlang::enquo(selected.columns)),
+  .id = "dataset"
+) %>%
+  dplyr::mutate(dataset = dplyr::case_when(
+    dataset == 1 ~ "Northcott",
+    dataset == 2 ~ "Robinson"
+  ))
+```
+
+A decent number of the top "named" LVs that are differentially expressed 
+(between subgroups) in Northcott, et al. are related to translation, RNA
+processing, ribosomes, etc., so we'll plot some of these in both the Northcott,
+et al. and Robinson, et al. datasets.
+
+```{r}
+lv.df %>%
+  dplyr::filter(LV %in% c("161,REACTOME_TRNA_AMINOACYLATION",
+                          "707,REACTOME_PEPTIDE_CHAIN_ELONGATION")) %>%
+  dplyr::mutate(LV = gsub(",", ", ", gsub("_", " ", LV))) %>%
+  dplyr::mutate(LV = paste("LV", LV)) %>%
+  ggplot(aes(x = subgroup, group = subgroup, y = Value, color = subgroup)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(alpha = 0.3, width = 0.3) +
+  facet_wrap(LV ~ dataset, scales = "free_x") +
+  labs(title = "Medulloblastoma", y = "LV expression value") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        legend.position = "none") +
+  scale_color_manual(values = c("#000000", "#E69F00", "#56B4E9", "#009E73"))
+```
+
+```{r}
+ggsave(file.path(plot.dir, "medulloblastoma_G4_LV161_LV707.pdf"))
+```
+
