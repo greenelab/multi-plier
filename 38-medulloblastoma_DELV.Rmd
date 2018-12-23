@@ -12,7 +12,7 @@ output:
 Here, we're testing for latent variable differential expression between
 medulloblastoma subgroups (Group 3, Group 4, and SHH).
 
-As in `36-medulloblastoma_recount2_model`, where we prepped the data we are
+As in `37-medulloblastoma_recount2_model`, where we prepped the data we are
 analyzing here, this is using 
 [Northcott, et al.](https://dx.doi.org/10.1038/nature11327)  and
 [Robinson, et al.](https://dx.doi.org/10.1038/nature11213) data.
@@ -51,7 +51,7 @@ to test for differences between.
 ### GSE37382 (Northcott, et al.)
 
 ```{r}
-northcott.b.file <- file.path("results", "36", "GSE37382_recount2_B.RDS")
+northcott.b.file <- file.path("results", "37", "GSE37382_recount2_B.RDS")
 northcott.sample.file <- file.path("data", "sample_info", 
                                    "GSE37382_cleaned_metadata.tsv")
 ```
@@ -82,7 +82,7 @@ colnames(northcott.sample.df)[1] <- "Sample"
 We'll repeat that process for the Robinson, et al. data
 
 ```{r}
-robinson.b.file <- file.path("results", "36", "GSE37418_recount2_B.RDS")
+robinson.b.file <- file.path("results", "37", "GSE37418_recount2_B.RDS")
 robinson.sample.file <- file.path("data", "sample_info", 
                                   "metadata_GSE37418.tsv")
 ```

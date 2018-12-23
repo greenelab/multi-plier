@@ -1,0 +1,6 @@
+INFO [2018-12-23 15:05:38] [[1]]
+INFO [2018-12-23 15:05:38] list(Robinson = robinson.delvs, Northcott = northcott.delvs)
+INFO [2018-12-23 15:05:38] 
+INFO [2018-12-23 15:05:38] [[2]]
+INFO [2018-12-23 15:05:38] file.path(plot.dir, "Medulloblastoma_DELV_Venn.tiff")
+INFO [2018-12-23 15:05:38] 
