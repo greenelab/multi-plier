@@ -36,6 +36,7 @@ wget https://github.com/greenelab/rheum-plier-data/raw/b7c50f4f756087e27915b0c7a
 
 # medulloblastoma
 wget https://github.com/greenelab/rheum-plier-data/raw/b7c50f4f756087e27915b0c7a020f8e0cda8527c/medulloblastoma/GSE37382/GSE37382_SCAN.pcl
+wget https://github.com/greenelab/rheum-plier-data/raw/05822c3a7b2e7c663d79426b1117a36dc2a0b892/medulloblastoma/GSE37418/GSE37418.tsv
 
 # get sample (e.g., phenotype) data
 cd .. && mkdir sample_info && cd sample_info
@@ -50,4 +51,4 @@ wget https://github.com/greenelab/rheum-plier-data/raw/4be547553f24fecac9e2f5c2b
 wget https://github.com/greenelab/rheum-plier-data/raw/55d86bb537f9e38c83fc3cca993cde48dc984411/glomeruli/ERCB_glom_diagnosis.tsv
 wget https://github.com/greenelab/rheum-plier-data/raw/b7c50f4f756087e27915b0c7a020f8e0cda8527c/DIPG/E-GEOD-26576/E-GEOD-26576.sdrf.txt
 wget https://github.com/greenelab/rheum-plier-data/raw/b7c50f4f756087e27915b0c7a020f8e0cda8527c/medulloblastoma/GSE37382/GSE37382_cleaned_metadata.tsv
-
+wget https://github.com/greenelab/rheum-plier-data/raw/05822c3a7b2e7c663d79426b1117a36dc2a0b892/medulloblastoma/GSE37418/metadata_GSE37418.tsv
