@@ -27,6 +27,16 @@ correlated, which would lend support to this notion.
 `%>%` <- dplyr::`%>%`
 ```
 
+#### Directory setup
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "40")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "40")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
 ## Read in data
 
 The SLE whole blood expression data
@@ -76,5 +86,13 @@ joined.neutrophil.df <- dplyr::inner_join(neutrophil.df, plier.neutrophil.df,
 cor(joined.neutrophil.df$recount2_LV603,
     joined.neutrophil.df$Neutrophil_estimate, 
     method = "pearson") ^ 2
+```
+
+### Save results
+
+```{r}
+readr::write_tsv(joined.neutrophil.df,
+                 path = file.path(results.dir, 
+                                  "Banchereau_MCPcounter_neutrophil_LV.tsv"))
 ```
 
