@@ -9,7 +9,8 @@ output:
 **J. Taroni 2018**
 
 A multi-panel figure for the neutrophil scatterplots in 
-`07-sle_cell_type_recount2_model` and `14-NARES_MCPcounter`
+`07-sle_cell_type_recount2_model`, `14-NARES_MCPcounter`, and
+`40-SLE_MCPcounter`
 
 ## Set up 
 
@@ -62,7 +63,6 @@ LVScatter <- function(neutro.df, lv, rsq, x.label, plot.title, plot.subtitle,
 }
 ```
 
-
 ### SLE whole blood
 
 ```{r}
@@ -86,6 +86,27 @@ recount.p <- LVScatter(neutro.df = sle.df, lv = "recount2_LV603", rsq = "0.36",
                        plot.subtitle = "SLE WB Compendium")
 ```
 
+#### Comparison to MCPcounter
+
+```{r}
+sle.mcp.file <- file.path("results", "40", 
+                          "Banchereau_MCPcounter_neutrophil_LV.tsv")
+sle.mcp.df <- readr::read_tsv(sle.mcp.file) %>%
+  dplyr::select(c("Sample", "Neutrophil_estimate", "recount2_LV603"))
+```
+
+```{r}
+sle.mcp.p <- LVScatter(neutro.df = sle.mcp.df, lv = "recount2_LV603", 
+                       rsq = 0.83,  x.label = "MultiPLIER LV603", 
+                       plot.title = "MultiPLIER",
+                       plot.subtitle = "SLE WB MCPcounter", 
+                       y.var = "Neutrophil_estimate", 
+                       y.label = "MCPcounter neutrophil estimate",
+                       count.data = FALSE) +
+  ggplot2::annotate("text", x = -0.3, y = 0.7, 
+                    label = paste("r-squared =", 0.83), size = 3.6)
+```
+
 ### NARES
 
 ```{r}
@@ -106,10 +127,10 @@ nares.p <- LVScatter(neutro.df = nares.df, lv = "recount_LV603", rsq = 0.90,
 ```
 
 ```{r}
-p <- cowplot::plot_grid(sle.p, recount.p, nares.p, ncol = 3, scale = 0.95,
-                   align = "h", labels = "AUTO")
+p <- cowplot::plot_grid(sle.p, recount.p, sle.mcp.p, nares.p, ncol = 4, 
+                        scale = 0.95, align = "h", labels = "AUTO")
 ggplot2::ggsave(file.path(plot.dir, "neutrophil_scatterplots.pdf"), plot = p,
-                          width = 12, height = 4)
+                          width = 16, height = 4)
 ```
 
 
