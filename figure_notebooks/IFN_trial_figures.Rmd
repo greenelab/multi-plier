@@ -159,8 +159,6 @@ p.title <- cowplot::ggdraw() +
   cowplot::draw_label("MultiPLIER", fontface = "bold",
                       size = 20)
 multi.p <- cowplot::plot_grid(p.title, p, ncol = 1, rel_heights = c(0.1, 1))
-ggplot2::ggsave(file.path(plot.dir, "IFN-K_main.pdf"), plot = multi.p, 
-                          width = 11, height = 6)
 ```
 
 ```{r}
@@ -216,7 +214,7 @@ m1.p
 
 ```{r}
 p <- cowplot::plot_grid(baseline.p, m1.p, align = "h", axis = "b", 
-                        rel_widths = c(1.5, 1), labels = c("A", "B"))
+                        rel_widths = c(1.5, 1), labels = c("C", "D"))
 p.title <- cowplot::ggdraw() + 
   cowplot::draw_label("Whole Blood Modular Framework", fontface = "bold",
                       size = 20)
@@ -285,7 +283,7 @@ wilcox.test(lv110.df$Change ~ lv110.df$Group)
 
 ```{r}
 p <- cowplot::plot_grid(baseline.p, lv6.p, align = "h", axis = "b", 
-                        rel_widths = c(1.5, 1), labels = c("C", "D"))
+                        rel_widths = c(1.5, 1), labels = c("E", "F"))
 p.title <- cowplot::ggdraw() + 
   cowplot::draw_label("SLE WB PLIER", fontface = "bold",
                       size = 20)
@@ -293,9 +291,9 @@ sle.p <- cowplot::plot_grid(p.title, p, ncol = 1, rel_heights = c(0.1, 1))
 ```
 
 ```{r}
-supp.p <- cowplot::plot_grid(mod.p, sle.p, ncol = 1, scale = 0.9)
-ggplot2::ggsave(file.path(plot.dir, "IFN-K_supplemental.pdf"), plot = supp.p,
-                width = 11, height = 11)
+overall.p <- cowplot::plot_grid(multi.p, mod.p, sle.p, ncol = 1, scale = 0.9)
+ggplot2::ggsave(file.path(plot.dir, "IFN-K_supplemental.pdf"), plot = overall.p,
+                width = 11, height = 14)
 ```
 
 ```{r}
