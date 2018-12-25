@@ -107,10 +107,10 @@ lv.df %>%
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(alpha = 0.3, width = 0.3) +
   facet_wrap(LV ~ dataset, scales = "free_x") +
-  labs(title = "Medulloblastoma", y = "LV expression value") +
+  labs(title = "Medulloblastoma Subgroups", y = "LV expression value") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        plot.title = element_text(hjust = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
         legend.position = "none") +
   scale_color_manual(values = c("#000000", "#E69F00", "#56B4E9", "#009E73"))
 ```
