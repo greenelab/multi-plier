@@ -107,43 +107,36 @@ We do this for a single line at a time that we've picked based on the relevance
 to any downstream analysis we might do (contact information, for example, 
 does not help us in this context).
 
+We'll write a custom function specifically for this context and environment
+
 ```{r}
-# get more information from the series matrix file
+# given a line number of the series matrix file (series.mat.file),
+# get the values
+GetSampleAttributes <- function(skip.value) {
+  conn <- file(series.mat.file)
+  open(conn)
+  sample.attributes <- read.table(conn, skip = skip.value, nrow = 1)
+  close(conn)
+  return(sample.attributes)
+}
+
 # sample accession e.g., GSMXXXXX
-conn <- file(series.mat.file)
-open(conn)
-sample.accession <- read.table(conn, skip = 79, nrow = 1)
-close(conn)
+sample.accession <- GetSampleAttributes(skip.value = 79)
 
 # source name
-conn <- file(series.mat.file)
-open(conn)
-source.name <- read.table(conn, skip = 85, nrow = 1)
-close(conn)
+source.name <- GetSampleAttributes(skip.value = 85)
 
 # tissue
-conn <- file(series.mat.file)
-open(conn)
-tissue <- read.table(conn, skip = 88, nrow = 1)
-close(conn)
+tissue <- GetSampleAttributes(skip.value = 88)
 
 # gender
-conn <- file(series.mat.file)
-open(conn)
-gender <- read.table(conn, skip = 89, nrow = 1)
-close(conn)
+gender <- GetSampleAttributes(skip.value = 89)
 
 # age at diagnosis
-conn <- file(series.mat.file)
-open(conn)
-age.dx <- read.table(conn, skip = 90, nrow = 1)
-close(conn)
+age.dx <- GetSampleAttributes(skip.value = 90)
 
 # overall survival
-conn <- file(series.mat.file)
-open(conn)
-survival <- read.table(conn, skip = 91, nrow = 1)
-close(conn)
+survival <- GetSampleAttributes(skip.value = 91)
 
 # get those lines into data.frame format
 smpl.info.df <- as.data.frame(t(dplyr::bind_rows(sample.accession, 
