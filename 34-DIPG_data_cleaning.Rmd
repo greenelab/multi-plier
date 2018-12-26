@@ -1,0 +1,280 @@
+---
+title: "DIPG: data cleaning"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+In this notebook, we'll clean diffuse intrinsic pontine glioma (DIPG) data.
+There is no DIPG data in recount2, so this is another use case for this
+project.
+
+We'll be working with two datasets stored in the
+[`greenelab/rheum-plier-data`](https://github.com/greenelab/rheum-plier-data) 
+repository:
+
+* [`E-GEOD-26576`](https://www.ebi.ac.uk/arrayexpress/experiments/E-GEOD-26576/)
+* [`GSE50021`](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE50021)
+
+**Citations:**
+
+> Paugh BS, Broniscer A, Qu C, et al. [Genome-wide analyses identify recurrent 
+amplifications of receptor tyrosine kinases and cell-cycle regulatory genes in 
+diffuse intrinsic pontine glioma.](https://dx.doi.org/10.1200/JCO.2011.35.5677) 
+_J Clin Oncol._ 2011;29(30):3999-4006.
+
+> Buczkowicz P, Hoeman C, Rakopoulos P, et al. [Genomic analysis of diffuse 
+intrinsic pontine gliomas identifies three molecular subgroups and recurrent 
+activating _ACVR1_ mutations.](https://dx.doi.org/10.1038/ng.2936) _Nat Genet._ 
+2014;46(5):451-6. 
+
+## Set up
+
+```{r}
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+# we need the function that aggregates duplicate gene identifiers to the
+# mean value
+source(file.path("util", "test_LV_differences.R"))
+```
+
+#### Directory setup
+
+```{r}
+# directory that holds the gene expression files
+exprs.dir <- file.path("data", "expression_data")
+# directory that holds the sample metadata
+sample.info.dir <- file.path("data", "sample_info")
+```
+
+## Read in and clean data
+
+### GSE50021
+
+We have the series matrix for `GSE50021`, which contains both the expression
+values and the metadata
+
+```{r}
+series.mat.file <- file.path(exprs.dir, "GSE50021_series_matrix.txt")
+
+# expression matrix -- everything but the comment lines that begin with !
+ma.data <- 
+  readr::read_delim(series.mat.file, 
+                    delim = "\t", 
+                    comment = "!",
+                    col_names = TRUE, 
+                    skip = 1)
+```
+
+#### Gene identifier conversion
+
+```{r}
+# The GPL information from GEO, which was made public on Jul 18, 2011 and 
+# last updated on Jan 18, 2013
+gpl.info.df <- readr::read_tsv(file.path(exprs.dir, "GPL13938-11302.txt"),
+                               comment = "#")
+```
+
+```{r}
+annot.gse50021.df <- gpl.info.df %>%
+  # from the GEO information, grab just the probe identifier and the gene
+  # symbol columns
+  dplyr::select(c(ID, Symbol)) %>%
+  # only ILMN IDs (probes) in both
+  dplyr::inner_join(ma.data, by = c("ID"  = "ID_REF")) %>%
+  # collapsing duplicate symbols later will require the symbols to be in the
+  # first column, called "Gene", with no additional columns
+  dplyr::mutate(Gene = Symbol) %>%
+  dplyr::select(-ID, -Symbol) %>%
+  dplyr::select(Gene, dplyr::everything())
+```
+
+Collapse duplicate symbols and write to file.
+
+```{r}
+# summarize to mean
+annot.mean.df <- PrepExpressionDF(annot.gse50021.df)
+readr::write_tsv(annot.mean.df, file.path(exprs.dir, "GSE50021_mean_agg.pcl"))
+```
+
+#### Sample metadata
+
+As mentioned above, metadata is also extracted from the series matrix file.
+We do this for a single line at a time that we've picked based on the relevance
+to any downstream analysis we might do (contact information, for example, 
+does not help us in this context).
+
+We'll write a custom function specifically for this context and environment
+
+```{r}
+# given a line number of the series matrix file (series.mat.file),
+# get the values
+GetSampleAttributes <- function(skip.value) {
+  conn <- file(series.mat.file)
+  open(conn)
+  sample.attributes <- read.table(conn, skip = skip.value, nrow = 1)
+  close(conn)
+  return(sample.attributes)
+}
+
+# sample accession e.g., GSMXXXXX
+sample.accession <- GetSampleAttributes(skip.value = 79)
+
+# source name
+source.name <- GetSampleAttributes(skip.value = 85)
+
+# tissue
+tissue <- GetSampleAttributes(skip.value = 88)
+
+# gender
+gender <- GetSampleAttributes(skip.value = 89)
+
+# age at diagnosis
+age.dx <- GetSampleAttributes(skip.value = 90)
+
+# overall survival
+survival <- GetSampleAttributes(skip.value = 91)
+
+# get those lines into data.frame format
+smpl.info.df <- as.data.frame(t(dplyr::bind_rows(sample.accession, 
+                                                 source.name, 
+                                                 tissue,
+                                                 gender,
+                                                 age.dx,
+                                                 survival))[-1, ]) 
+colnames(smpl.info.df) <- c("sample_accession", "source_name", "tissue",
+                            "gender", "age_at_diagnosis_yrs", 
+                            "overall_survival_yrs")
+
+# strip extraneous strings
+smpl.info.df <- smpl.info.df %>%
+  dplyr::mutate(tissue = gsub("cell type: ", "", tissue),
+                gender = gsub("gender: ", "", gender),
+                age_at_diagnosis_yrs = gsub("age at dx \\(years\\): ", "", 
+                                            age_at_diagnosis_yrs),
+                overall_survival_yrs = gsub("os \\(years\\): ", "", 
+                                            overall_survival_yrs))
+
+# change "N/A" to NA
+smpl.info.df[which(smpl.info.df == "N/A", arr.ind = TRUE)] <- NA
+```
+
+Write the cleaned metadata to a TSV file.
+
+```{r}
+readr::write_tsv(smpl.info.df, 
+                 file.path(sample.info.dir, "GSE50021_cleaned_metadata.tsv"))
+```
+
+Clean up the workspace a bit before working with the next dataset.
+
+```{r}
+to.keep <- c("%>%", "exprs.dir", "sample.info.dir", "PrepExpressionDF")
+rm(list = setdiff(ls(), to.keep))
+```
+
+### E-GEOD-26576
+
+We used an Entrez ID BrainArray package to process this data set and we need 
+gene symbols to work with PLIER.
+
+```{r}
+# SCANfast processed PCL
+gse26576.file <- file.path(exprs.dir, 
+                           "DIPG_E-GEOD-26576_hgu133plus2_SCANfast.pcl")
+
+# read in the PCL file, remove the trailing "_at" added by Brainarray (these
+# are Entrez gene identifiers), drop the Entrez IDs with _at appended, reordered
+# such that the gene identifiers are the first column
+gse26576.df <- readr::read_tsv(gse26576.file) %>%
+  dplyr::mutate(EntrezID = sub("_at", "", X1)) %>%
+  dplyr::select(-X1) %>%
+  dplyr::select(EntrezID, dplyr::everything())
+```
+
+#### Gene identifier conversion
+
+```{r}
+# extract the Entrez ID Gene symbol mapping from org.Hs.eg.db
+symbol.obj <- org.Hs.eg.db::org.Hs.egSYMBOL
+mapped.genes <- AnnotationDbi::mappedkeys(symbol.obj)
+symbol.list <- as.list(symbol.obj[mapped.genes])
+symbol.df <- as.data.frame(cbind(names(symbol.list), unlist(symbol.list)))
+colnames(symbol.df) <- c("EntrezID", "GeneSymbol")
+```
+
+Join the annotation `data.frame` to the expression `data.frame`
+
+```{r}
+annot.gse26576.df <- symbol.df %>%
+  dplyr::inner_join(gse26576.df, by = "EntrezID")
+rm(symbol.df)
+```
+
+Are there any duplicates?
+
+```{r}
+any(duplicated(annot.gse26576.df$GeneSymbol))
+```
+
+No, so we don't need to do anything else.
+Write the `data.frame` that includes gene symbols to file.
+
+```{r}
+gse26576.output.file <- 
+  file.path(exprs.dir, 
+            "DIPG_E-GEOD-26576_hgu133plus2_SCANfast_with_GeneSymbol.pcl")
+readr::write_tsv(annot.gse26576.df, path = gse26576.output.file)
+```
+
+#### Sample Metadata
+
+```{r}
+meta.gse26576.file <- file.path(sample.info.dir, "E-GEOD-26576.sdrf.txt")
+meta.gse26576.df <- readr::read_tsv(meta.gse26576.file)
+```
+
+The sample-data relationship files from ArrayExpress (specifically, their 
+column names) are pretty tidyverse-unfriendly.
+
+```{r}
+cleaned.meta.df <- data.frame(
+  sample_id = gsub(" 1", "", meta.gse26576.df$`Source Name`),
+  sample_file = meta.gse26576.df$`Array Data File`,
+  sample_title = meta.gse26576.df$`Comment [Sample_title]`,
+  age_at_diagnosis = meta.gse26576.df$`Characteristics[age at diagnosis (years)]`,
+  disease_state = meta.gse26576.df$`Characteristics[disease]`,
+  histology = meta.gse26576.df$`Characteristics[histology]`,
+  sample_collection = meta.gse26576.df$`Characteristics[sample collection]`,
+  material_type = meta.gse26576.df$`Material Type`
+) %>%
+  # get rid of the genomic DNA samples
+  dplyr::filter(material_type == "total RNA") %>%
+  dplyr::select(-material_type)
+```
+
+There is information in the `sample_title` field that can help us fill in
+the `disease_state` blanks.
+
+```{r}
+cleaned.meta.df <- cleaned.meta.df %>%
+  dplyr::mutate(disease_state = dplyr::case_when(
+    grepl("normal", cleaned.meta.df$sample_title) ~ "normal",
+    grepl("low", cleaned.meta.df$sample_title) ~ "LGG",
+    grepl("DIPG", cleaned.meta.df$sample_title) ~ "DIPG",
+    grepl("Glioblastoma", cleaned.meta.df$sample_title) ~ "Glioblastoma"
+  ))
+```
+
+The `sample_file` field will match the headers of the PCL file.
+Write the cleaned metadata to file.
+
+```{r}
+readr::write_tsv(cleaned.meta.df, 
+                 path = file.path(sample.info.dir, 
+                                  "E-GEOD-26576_cleaned_metadata.tsv"))
+```
+
