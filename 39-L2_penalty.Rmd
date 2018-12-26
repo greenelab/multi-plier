@@ -1,0 +1,225 @@
+---
+title: "L2 Penalty"
+output:   
+  html_notebook: 
+    toc: true
+    toc_float: true
+---
+
+**J. Taroni 2018**
+
+We've been asked to clarify why an L2 penalty is used on the PLIER `B`
+matrix. 
+
+We'll see what happens _in practice_ if we set the `L2` parameter to
+zero.
+
+Let's work with the data that are 500 randomly selected samples from recount2;
+this is out of convenience, as the computational requirements will be 
+relatively light.
+
+The main PLIER function, for the version of PLIER we've used, begins here:
+https://github.com/wgmao/PLIER/blob/a2d4a2aa343f9ed4b9b945c04326bebd31533d4d/R/Allfuncs.R#L227
+
+## Set up
+
+```{r}
+`%>%` <- dplyr::`%>%`
+library(PLIER)
+```
+
+We'll need `GetPathwayCoverage`
+
+```{r}
+source(file.path("util", "plier_util.R"))
+```
+
+#### Directories
+
+Plot and results directories specifically for this notebook.
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "39")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "39")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+Working only with `n = 500` here.
+
+```{r}
+models.file <- file.path("models", "subsampled_recount2_PLIER_model_500.RDS")
+models.list <- readRDS(models.file)
+```
+
+Get the prior information matrix used with the subsampling experiments.
+
+```{r}
+recount.prepped.data <- readRDS(file.path("data", "recount2_PLIER_data", 
+                                          "recount_data_prep_PLIER.RDS"))
+pathway.mat <- recount.prepped.data$all.paths.cm
+rm(recount.prepped.data)
+```
+
+## Main
+
+What constants were used originally (calculated from SVD)?
+
+```{r}
+lapply(models.list, function(x) x$PLIER$L1)
+```
+
+```{r}
+lapply(models.list, function(x) x$PLIER$L2)
+```
+
+These are the automatically selected values.
+
+### Training with `L2 = 0`
+
+A custom function for setting L2 to zero.
+
+```{r}
+# plier.repeat is a list with the elements exprs (a gene expression matrix) and
+# PLIER (output of PLIER); it is a repeat from script/subsampling_PLIER.R.
+# use PLIER results as input to a new PLIER model, where we use the k, L1, 
+# priorMat, and expression from a repeat, BUT set L2 = 0
+# only intended to be used in this environment (need pathway.mat)
+SetL2Zero <- function(plier.repeat) {
+  results <- PLIER::PLIER(data = as.matrix(plier.repeat$exprs),
+                          priorMat = pathway.mat,
+                          k = nrow(plier.repeat$PLIER$B),
+                          L1 = plier.repeat$PLIER$L1,
+                          L2 = 0,
+                          trace = TRUE)
+  message("\n\n")
+  return(results)
+}
+```
+
+Perform the training and save the results to file (they will be small 
+enough to track with Git LFS).
+
+```{r}
+penalty.zero.list <- lapply(models.list, SetL2Zero)
+saveRDS(penalty.zero.list, 
+        file.path(results.dir, 
+                  "subsampled_recount2_PLIER_model_L2_to_zero_500.RDS"))
+```
+
+## Pathway coverage
+
+```{r}
+pathway.coverage.list <- lapply(penalty.zero.list, GetPathwayCoverage)
+```
+
+```{r}
+coverage.df <- reshape2::melt(lapply(pathway.coverage.list, 
+                                     function(x) x$pathway))
+colnames(coverage.df) <- c("L2_zero_value", "seed")
+```
+
+Read in the results from the original subsampling experiment
+
+```{r}
+coverage.file <- file.path("results", "30", "subsampled_pathway_coverage.tsv")
+subsampling.coverage.df <- readr::read_tsv(coverage.file) %>%
+  dplyr::filter(metric == "pathway coverage",
+                sample_size == "500") %>%
+  dplyr::select(value, seed)
+colnames(subsampling.coverage.df)[1] <- "automatic_value"
+```
+
+Join and find the difference in pathway coverage between the "normal" model and 
+the `L2 = 0` model
+
+```{r}
+coverage.df <- coverage.df %>%
+  dplyr::mutate(seed = as.integer(seed)) %>%
+  dplyr::inner_join(subsampling.coverage.df, by = "seed") %>%
+  dplyr::select(seed, dplyr::everything()) %>%
+  dplyr::mutate(difference = automatic_value - L2_zero_value)
+```
+
+```{r}
+coverage.df
+```
+
+```{r}
+readr::write_tsv(coverage.df, 
+                 file.path(results.dir, "pathway_coverage_with_difference.tsv"))
+```
+
+### LV-pathway association summaries
+
+Let's look at an example summary data.frame for `L2 = 0`
+
+```{r}
+penalty.zero.list$`2876`$summary %>% 
+  dplyr::filter(FDR < 0.05)
+```
+
+And another:
+
+```{r}
+penalty.zero.list$`8828`$summary %>% 
+  dplyr::filter(FDR < 0.05)
+```
+
+By going through the pages of these summaries, we can see that gene sets
+related to the spliceosome are woefully overrepresented.
+
+### `Z` matrix
+
+One explanation for this is that the loadings, `Z`, are no longer capturing
+sparse combinations of pathways.
+We can check the number of positive entries for each latent variable (column).
+
+```{r}
+example.z.matrix <- penalty.zero.list$`2876`$Z
+positive.counts <- apply(example.z.matrix, 2, function(x) sum(x > 0))
+```
+
+Compare to the `Z` matrix for automatically selected `L2` (same seed and 
+therefore expression matrix)
+
+```{r}
+auto.example.z.matrix <- models.list$`2876`$PLIER$Z
+auto.positive.counts <- apply(auto.example.z.matrix, 2, function(x) sum(x > 0))
+```
+
+A `data.frame` for plotting
+
+```{r}
+z.positive.df <- data.frame(
+  positive_count = c(positive.counts, auto.positive.counts),
+  model_type <- c(rep("L2 = 0", length(positive.counts)),
+                  rep("L2 automatic", length(auto.positive.counts)))
+)
+```
+
+Density plot of positive values
+
+```{r}
+z.positive.df %>%
+  ggplot2::ggplot(ggplot2::aes(x = positive_count, group = model_type,
+                               fill = model_type)) +
+  ggplot2::geom_density(alpha = 0.5) +
+  ggplot2::theme_bw() +
+  ggplot2::labs(x = "number of positive entries in Z",
+                title = "Effect of L2 = 0 on Loadings") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                 text = ggplot2::element_text(size = 12)) +
+  ggplot2::guides(fill = ggplot2::guide_legend(title = "parameter")) +
+  ggplot2::scale_fill_manual(values = c("#FFFFFF", "#545454"))
+```
+
+```{r}
+ggplot2::ggsave(file.path(plot.dir, 
+                          "L2_effect_on_Z_positive_entries_density.pdf"),
+                plot = ggplot2::last_plot())
+```
+
