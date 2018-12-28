@@ -12,7 +12,7 @@ RUN R install2.r --error \
 	RCurl
 
 # bioconductor packages
-RUN R -e "BiocInstaller::biocLite(c('pd.hg.u133.plus.2', 'pd.hg.u133a', 'pd.hg.u133b', 'pd.hg.u95av2', 'pd.hugene.1.0.st.v1', 'pd.hugene.1.1.st.v1', 'SCAN.UPC', 'affy', 'affyio', 'preprocessCore', 'affxparser', 'illuminaHumanv4.db', 'hgug4112a.db', 'biomaRt', 'org.Hs.eg.db', 'qvalue', 'SRAdb', 'recount'))"
+RUN R -e "BiocInstaller::biocLite(c('pd.hg.u133.plus.2', 'pd.hg.u133a', 'pd.hg.u133b', 'pd.hg.u95av2', 'pd.hugene.1.0.st.v1', 'pd.hugene.1.1.st.v1', 'SCAN.UPC', 'affy', 'affyio', 'preprocessCore', 'affxparser', 'illuminaHumanv4.db', 'hgug4112a.db', 'biomaRt', 'org.Hs.eg.db', 'qvalue', 'SRAdb', 'recount', 'ComplexHeatmap'))"
 
 # brainarray for affymetrix arrays (v22.0.0)
 RUN R -e "devtools::install_url('http://mbni.org/customcdf/22.0.0/entrezg.download/hgu133plus2hsentrezgprobe_22.0.0.tar.gz')"
@@ -38,8 +38,9 @@ RUN R -e "devtools::install_github('topepo/caret/pkg/caret', ref = '6546939345fe
 RUN R -e "devtools::install_url('https://cran.r-project.org/src/contrib/ggsignif_0.4.0.tar.gz')"
 RUN R -e "devtools::install_url('https://cran.r-project.org/src/contrib/VennDiagram_1.6.20.tar.gz')"
 RUN R -e "devtools::install_url('https://cran.r-project.org/src/contrib/Archive/cowplot/cowplot_0.9.2.tar.gz')"
+RUN R -e "devtools::install_url('https://cran.r-project.org/src/contrib/optparse_1.6.0.tar.gz')"
 
 # install specified versions of R packages
 RUN R -e "devtools::install_version('doParallel', version = '1.0.11')"
 RUN R -e "devtools::install_version('e1071', version = '1.6-8')"
-
+RUN R -e "devtools::install_version('UpSetR', version = '1.3.2')"
