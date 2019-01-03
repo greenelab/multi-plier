@@ -1640,11 +1640,11 @@ filtered.metasra &lt;- metasra[which(names(metasra) %in% conversion.df$sample)]<
 <p>Not all of the runs in the subset of the recount2 compendium we used are present in MetaSRA.</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGVuZ3RoKGZpbHRlcmVkLm1ldGFzcmEpIC8gbGVuZ3RoKHJ1bi5hY2Nlc3Npb24pXG5gYGAifQ== -->
-<pre class="r"><code>length(filtered.metasra) / length(run.accession)</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGVuZ3RoKGZpbHRlcmVkLm1ldGFzcmEpIC8gbGVuZ3RoKHVuaXF1ZShjb252ZXJzaW9uLmRmJHNhbXBsZSkpXG5gYGAifQ== -->
+<pre class="r"><code>length(filtered.metasra) / length(unique(conversion.df$sample))</code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDAuODEzMzUwNlxuIn0= -->
-<pre><code>[1] 0.8133506</code></pre>
+<!-- rnb-output-begin eyJkYXRhIjoiWzFdIDAuOTk0MDI2NlxuIn0= -->
+<pre><code>[1] 0.9940266</code></pre>
 <!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->

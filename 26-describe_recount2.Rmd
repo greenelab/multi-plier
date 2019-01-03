@@ -156,7 +156,7 @@ Not all of the runs in the subset of the recount2 compendium we used are
 present in MetaSRA.
 
 ```{r}
-length(filtered.metasra) / length(run.accession)
+length(filtered.metasra) / length(unique(conversion.df$sample))
 ```
 
 But the majority are.
