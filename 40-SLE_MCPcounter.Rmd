@@ -1,0 +1,98 @@
+---
+title: "SLE whole blood MCPcounter"
+output: html_notebook
+---
+
+**J. Taroni 2018**
+
+Are the expression values of the neutrophil-associated latent variables 
+correlated with MCPCounter 
+([Becht, et al.](https://doi.org/10.1186/s13059-016-1070-5)) neutrophil 
+estimates?
+
+The correlations between the neutrophil counts and the LV expression
+levels are modest.
+(This question has come up more than once!)
+We think this is likely because neutrophils are terminally differentiated cells,
+so it is a limitation of using gene expression as a measure of neutrophil count
+rather than a limitation intrinsic to PLIER models or the MultiPLIER approach.
+
+So, we'll check to see if the two estimates from expression are highly
+correlated, which would lend support to this notion.
+
+## Set up
+
+```{r}
+# magrittr pipe
+`%>%` <- dplyr::`%>%`
+```
+
+#### Directory setup
+
+```{r}
+# plot and result directory setup for this notebook
+plot.dir <- file.path("plots", "40")
+dir.create(plot.dir, recursive = TRUE, showWarnings = FALSE)
+results.dir <- file.path("results", "40")
+dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read in data
+
+The SLE whole blood expression data
+
+```{r}
+sle.wb.file <- 
+  file.path("data", "expression_data", 
+            "SLE_WB_all_microarray_QN_zto_before_with_GeneSymbol.pcl")
+
+exprs.mat <- readr::read_tsv(sle.wb.file) %>%
+  dplyr::select(-EntrezID) %>%
+  tibble::column_to_rownames("GeneSymbol") %>%
+  as.matrix()
+```
+
+We'd like to compare this to results from `07-sle_cell_type_recount2_model`.
+
+```{r}
+plier.neutrophil.file <- file.path("results", "07", 
+                                   "neutrophil_count_LV_both_models.tsv")
+plier.neutrophil.df <- readr::read_tsv(plier.neutrophil.file)
+```
+
+## MCPCounter
+
+```{r}
+# get cell type estimates with MCPcounter
+mcp.results <- 
+  MCPcounter::MCPcounter.estimate(expression = exprs.mat,
+                                  featuresType = "HUGO_symbols")
+
+# we're only interested in the neutrophil counts
+neutrophil.df <- reshape2::melt(mcp.results) %>%
+  dplyr::filter(Var1 == "Neutrophils") %>% 
+  dplyr::select(-Var1)
+colnames(neutrophil.df) <- c("Sample", "Neutrophil_estimate")
+```
+
+## Compare
+
+```{r}
+joined.neutrophil.df <- dplyr::inner_join(neutrophil.df, plier.neutrophil.df,
+                                          by = "Sample")
+```
+
+```{r}
+cor(joined.neutrophil.df$recount2_LV603,
+    joined.neutrophil.df$Neutrophil_estimate, 
+    method = "pearson") ^ 2
+```
+
+### Save results
+
+```{r}
+readr::write_tsv(joined.neutrophil.df,
+                 path = file.path(results.dir, 
+                                  "Banchereau_MCPcounter_neutrophil_LV.tsv"))
+```
+
