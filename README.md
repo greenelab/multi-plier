@@ -17,12 +17,12 @@ Data and code, other than the recount2 training set and model, associated with [
 
 ## Dependencies
 
-We have prepared a [Docker](https://www.docker.com) image that contains all the dependencies required to reproduce these analyses. See [`docker/Dockerfile`](https://github.com/greenelab/multi-plier/blob/eb30c25e236ae8590d275f9d351f804bd922ca0a/docker/Dockerfile) for more information about dependencies. 
+We have prepared a [Docker](https://www.docker.com) image that contains all the dependencies required to reproduce these analyses. See [`docker/Dockerfile`](https://github.com/greenelab/multi-plier/blob/5a4324c8407f0db9eba40bd0bf8d1d9d2dc1bb66/docker/Dockerfile) for more information about dependencies. 
 
 After installing Docker ([Docker documentation](https://docs.docker.com)), the image can be obtained:
 
 ```
-docker pull jtaroni/multi-plier:0.1.0
+docker pull jtaroni/multi-plier:0.2.0
 ```
 
 We use [R notebooks](https://rmarkdown.rstudio.com/r_notebooks) for analysis, which can be run and modified using [RStudio](https://www.rstudio.com).
