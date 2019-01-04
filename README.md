@@ -17,12 +17,12 @@ Data and code, other than the recount2 training set and model, associated with [
 
 ## Dependencies
 
-We have prepared a [Docker](https://www.docker.com) image that contains all the dependencies required to reproduce these analyses. See [`docker/Dockerfile`](https://github.com/greenelab/multi-plier/blob/eb30c25e236ae8590d275f9d351f804bd922ca0a/docker/Dockerfile) for more information about dependencies. 
+We have prepared a [Docker](https://www.docker.com) image that contains all the dependencies required to reproduce these analyses. See [`docker/Dockerfile`](https://github.com/greenelab/multi-plier/blob/5a4324c8407f0db9eba40bd0bf8d1d9d2dc1bb66/docker/Dockerfile) for more information about dependencies. 
 
 After installing Docker ([Docker documentation](https://docs.docker.com)), the image can be obtained:
 
 ```
-docker pull jtaroni/multi-plier:0.1.0
+docker pull jtaroni/multi-plier:0.2.0
 ```
 
 We use [R notebooks](https://rmarkdown.rstudio.com/r_notebooks) for analysis, which can be run and modified using [RStudio](https://www.rstudio.com).
@@ -97,6 +97,18 @@ we exclude these from the TOC below.
 * [Exploring a rituximab (RTX) dataset](https://greenelab.github.io/multi-plier/24-explore_rtx.nb.html) (preliminary)
 * [Predicting RTX response](https://greenelab.github.io/multi-plier/25-predict_response.nb.html) (very preliminary, see [#18](https://github.com/greenelab/multi-plier/pull/18))
 * [Describing the recount2 training set with MetaSRA predictions](https://greenelab.github.io/multi-plier/26-describe_recount2.nb.html)
+* [Does the recount2 model capture oncogenic pathways that were not supplied during training?](https://greenelab.github.io/multi-plier/27-oncogenic_pathway_recount2_model.nb.html)
+* [Evaluating the influence of the sample size of and biological conditions in training sets on PLIER models](https://greenelab.github.io/multi-plier/30-evaluate_sample_size_and_biological_context.nb.html)
+* [Plotting for sample size, biological context evaluations](https://greenelab.github.io/multi-plier/31-plotting_sample_size_biological_context_coverage.nb.html)
+* [How well do different models distinguish or "separate" similar pathways?](https://greenelab.github.io/multi-plier/32-explore_pathway_separation.nb.html)
+* [What pathways are captured by models trained on different biological contexts?](https://greenelab.github.io/multi-plier/33-pathway_overlap_biological_contexts.nb.html)
+* [Data cleaning for diffuse intrinsic pontine glioma (DIPG)](https://greenelab.github.io/multi-plier/34-DIPG_data_cleaning.nb.html)
+* [DIPG MultiPLIER](https://greenelab.github.io/multi-plier/35-DIPG_recount2_model.nb.html)
+* [DIPG analysis](https://greenelab.github.io/multi-plier/36-DIPG_analysis.nb.html) (preliminary)
+* [Medulloblastoma MultiPLIER](https://greenelab.github.io/multi-plier/37-medulloblastoma_recount2_model.nb.html)
+* [Identifying latent variables that are differentially expressed between medulloblastoma subgroups](https://greenelab.github.io/multi-plier/38-medulloblastoma_DELV.nb.html)
+* [Exploring the `L2` parameter](https://greenelab.github.io/multi-plier/39-L2_penalty.nb.html)
+* [`MCPcounter` neutrophil estimates for the SLE compendium](https://greenelab.github.io/multi-plier/40-SLE_MCPcounter.nb.html)
 
 Note that not all analyses present in this repository are included in the preprint.
 
