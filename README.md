@@ -97,6 +97,18 @@ we exclude these from the TOC below.
 * [Exploring a rituximab (RTX) dataset](https://greenelab.github.io/multi-plier/24-explore_rtx.nb.html) (preliminary)
 * [Predicting RTX response](https://greenelab.github.io/multi-plier/25-predict_response.nb.html) (very preliminary, see [#18](https://github.com/greenelab/multi-plier/pull/18))
 * [Describing the recount2 training set with MetaSRA predictions](https://greenelab.github.io/multi-plier/26-describe_recount2.nb.html)
+* [Does the recount2 model capture oncogenic pathways that were not supplied during training?](https://greenelab.github.io/multi-plier/27-oncogenic_pathway_recount2_model.nb.html)
+* [Evaluating the influence of the sample size of and biological conditions in training sets on PLIER models](https://greenelab.github.io/multi-plier/30-evaluate_sample_size_and_biological_context.nb.html)
+* [Plotting for sample size, biological context evaluations](https://greenelab.github.io/multi-plier/31-plotting_sample_size_biological_context_coverage.nb.html)
+* [How well do different models distinguish or "separate" similar pathways?](https://greenelab.github.io/multi-plier/32-explore_pathway_separation.nb.html)
+* [What pathways are captured by models trained on different biological contexts?](https://greenelab.github.io/multi-plier/33-pathway_overlap_biological_contexts.nb.html)
+* [Data cleaning for diffuse intrinsic pontine glioma (DIPG)](https://greenelab.github.io/multi-plier/34-DIPG_data_cleaning.nb.html)
+* [DIPG MultiPLIER](https://greenelab.github.io/multi-plier/35-DIPG_recount2_model.nb.html)
+* [DIPG analysis](https://greenelab.github.io/multi-plier/36-DIPG_analysis.nb.html) (preliminary)
+* [Medulloblastoma MultiPLIER](https://greenelab.github.io/multi-plier/37-medulloblastoma_recount2_model.nb.html)
+* [Identifying latent variables that are differentially expressed between medulloblastoma subgroups](https://greenelab.github.io/multi-plier/38-medulloblastoma_DELV.nb.html)
+* [Exploring the `L2` parameter](https://greenelab.github.io/multi-plier/39-L2_penalty.nb.html)
+* [`MCPcounter` neutrophil estimates for the SLE compendium](https://greenelab.github.io/multi-plier/40-SLE_MCPcounter.nb.html)
 
 Note that not all analyses present in this repository are included in the preprint.
 
