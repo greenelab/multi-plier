@@ -11,9 +11,7 @@
 Data used in this analysis repo were processed in [greenelab/rheum-plier-data](https://github.com/greenelab/rheum-plier-data). 
 Please see that repository for relevant citations.
 
-The recount2 training data and the corresponding PLIER model (MultiPLIER) are too large to be stored with Git LFS, so we have placed them on [figshare](https://figshare.com/). **DOI: [10.6084/m9.figshare.5716033.v4](https://doi.org/10.6084/m9.figshare.5716033.v4)**
-
-Data and code, other than the recount2 training set and model, associated with [`v0.1.0`](https://github.com/greenelab/multi-plier/tree/v0.1.0) are available at the following **DOI: [10.6084/m9.figshare.6982919](https://doi.org/10.6084/m9.figshare.6982919)**
+Data and code, including items that are too large to be stored with Git LFS (e.g., some models), associated with [`v0.2.0`](https://github.com/greenelab/multi-plier/tree/v0.2.0) are available at the following **DOI: [10.6084/m9.figshare.6982919.v2](https://doi.org/10.6084/m9.figshare.6982919.v2)**
 
 ## Dependencies
 
@@ -106,4 +104,4 @@ The [`figure_notebooks`](https://github.com/greenelab/multi-plier/tree/master/fi
 
 This repository is dual licensed as **[BSD 3-Clause](https://github.com/greenelab/multi-plier/blob/master/LICENSE_BSD-3.md)** (source code) and **[CC0 1.0](https://github.com/greenelab/multi-plier/blob/master/LICENSE_CC0.md)** (figures, documentation, and our arrangement of the facts contained in the underlying data), with the following exceptions:
 
-* recount2 data downloaded from [this figshare accession](https://doi.org/10.6084/m9.figshare.5716033.v4) is licensed **CC-BY**.
+* recount2 data is licensed **CC-BY**.
