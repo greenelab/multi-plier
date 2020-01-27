@@ -100,7 +100,7 @@ head(sort(recount.plier$Z[, 599], decreasing = TRUE), 50)
 
 Some of these are major or minor autoantigens in ANCA-associated vasculitis.
 This is consistent with the original publication 
-([Cheadle, et al. _A&R._ 2010.](https://dx.doi.org/10.1002/art.27398)): 
+([Cheadle, et al. _A&R._ 2010.](https://doi.org/10.1002/art.27398)): 
 the authors found that "neutrophil granule constituent genes" were highly 
 expressed in the PBMC fraction from patients with GPA that could not be 
 attributed to contamination with mature granulocytes.

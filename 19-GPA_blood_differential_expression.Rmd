@@ -10,7 +10,7 @@ output:
 
 Here, we'll perform differential expression (of LV) analyses for the PBMC data 
 from Cheadle C, Berger AE, Andrade F, et al. 
-[Transcription of PR3 and Related Myelopoiesis Genes in Peripheral Blood Mononuclear Cells in Active Wegener’s Granulomatosis](https://dx.doi.org/10.1002/art.27398). 
+[Transcription of PR3 and Related Myelopoiesis Genes in Peripheral Blood Mononuclear Cells in Active Wegener’s Granulomatosis](https://doi.org/10.1002/art.27398). 
 _Arthritis & Rheumatism_, 2010. doi: 10.1002/art.27398.
 
 We'll be comparing the healthy controls, the patients with a GPA signature 

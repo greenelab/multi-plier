@@ -9,8 +9,8 @@ output:
 **J. Taroni 2018**
 
 We've looked into differential expression of latent variables in the
-[Northcott, et al.](https://dx.doi.org/10.1038/nature11327) 
-and [Robinson, et al.](https://dx.doi.org/10.1038/nature11213) 
+[Northcott, et al.](https://doi.org/10.1038/nature11327) 
+and [Robinson, et al.](https://doi.org/10.1038/nature11213) 
 medulloblastoma datasets. 
 Specifically, we looked at differential expression between subgroups of 
 patients.

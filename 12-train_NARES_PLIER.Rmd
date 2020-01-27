@@ -10,7 +10,7 @@ output:
 
 The NARES study was published in the following article:
 
-> Grayson PC, Steiling K, Platt M, et al. [Defining the Nasal Transcriptome in Granulomatosis with Polyangiitis](https://dx.doi.org/10.1002/art.39185). _Arthritis & Rheumatology_, 2015. doi: 10.1002/art.39185.
+> Grayson PC, Steiling K, Platt M, et al. [Defining the Nasal Transcriptome in Granulomatosis with Polyangiitis](https://doi.org/10.1002/art.39185). _Arthritis & Rheumatology_, 2015. doi: 10.1002/art.39185.
 
 We processed this data in the [`greenelab/rheum-data-plier`](https://github.com/greenelab/rheum-plier-data) 
 repo.

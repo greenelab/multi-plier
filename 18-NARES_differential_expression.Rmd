@@ -8,7 +8,7 @@ output:
 
 **J. Taroni 2018**
 
-The NARES study ([Grayson, et al. _Arthritis Rheumatol_. 2015](https://dx.doi.org/10.1002/art.39185)) 
+The NARES study ([Grayson, et al. _Arthritis Rheumatol_. 2015](https://doi.org/10.1002/art.39185)) 
 included three sets of patients with ANCA-associated vasculitis: those with 
 active nasal disease, prior nasal disease, and those with no history of nasal 
 disease.

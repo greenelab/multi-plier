@@ -138,7 +138,7 @@ data.frame(overlaps.list$a1)
 We can see that half of these are immune cell-related genesets. 
 Specifically, the `DMAP` gene sets are further differentiated cell types 
 (see [Figure 1](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3049864/figure/F1/)
-of [Novershtern, et al. _Cell._ 2011.](https://dx.doi.org/10.1016%2Fj.cell.2011.01.004))
+of [Novershtern, et al. _Cell._ 2011.](https://doi.org/10.1016%2Fj.cell.2011.01.004))
 
 ### Everything but cancer
 
