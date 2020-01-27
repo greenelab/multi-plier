@@ -191,7 +191,7 @@ the `B` matrix may reduce the dataset effect.
 The AUC (and p-values) are calculated by holding out 1/5th of genes in a pathway
 (in the prior information matrix `C`), running PLIER, and testing how well the 
 loadings in `Z` capture the held-out genes.
-For more information, check out the [PLIER preprint (Mao, et al. 2017.)](http://dx.doi.org/10.1101/116061).
+For more information, check out the [PLIER preprint (Mao, et al. 2017.)](https://doi.org/10.1101/116061).
 
 ```{r}
 # Which LVs have pathways with AUC > 0.75?

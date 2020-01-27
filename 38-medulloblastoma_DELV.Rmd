@@ -14,8 +14,8 @@ medulloblastoma subgroups (Group 3, Group 4, and SHH).
 
 As in `37-medulloblastoma_recount2_model`, where we prepped the data we are
 analyzing here, this is using 
-[Northcott, et al.](https://dx.doi.org/10.1038/nature11327)  and
-[Robinson, et al.](https://dx.doi.org/10.1038/nature11213) data.
+[Northcott, et al.](https://doi.org/10.1038/nature11327)  and
+[Robinson, et al.](https://doi.org/10.1038/nature11213) data.
 
 ## Set up
 

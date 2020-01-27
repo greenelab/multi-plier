@@ -339,11 +339,11 @@ variables that meets that criterion.
 container; we did not specify `frac`.)
 
 This parameter is used to set `L3`, which is the penalty on `U` that controls
-sparsity ([Mao, et al. _bioRxiv_. 2017.](http://dx.doi.org/10.1101/116061)).
+sparsity ([Mao, et al. _bioRxiv_. 2017.](https://doi.org/10.1101/116061)).
 Based on my understanding, this controls the proportion of positive entries in 
 `U` (i.e., the number of gene sets that an LV has some association with), but 
 it _does not_ guarantee that all of these associations will be significant
-([Mao, et al. _bioRxiv_. 2017.](http://dx.doi.org/10.1101/116061)) and 
+([Mao, et al. _bioRxiv_. 2017.](https://doi.org/10.1101/116061)) and 
 the cutoff we happen to be using (`FDR < 0.05`) is not taken into account. 
 
 For reference, this is the sample size information for these different training

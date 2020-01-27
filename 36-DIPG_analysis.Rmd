@@ -90,7 +90,7 @@ gse50021.results$limma %>%
   dplyr::filter(adj.P.Val < 0.05)
 ```
 
-After revisiting [Buczkowicz, et al.](https://dx.doi.org/10.1038/ng.2936) and
+After revisiting [Buczkowicz, et al.](https://doi.org/10.1038/ng.2936) and
 the [`GSE50021`](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE50021)
 accession, there is no information about which _part_ of the brain the normal
 brain came from or how it was obtained. 
